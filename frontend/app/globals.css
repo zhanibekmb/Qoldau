@@ -1,0 +1,139 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Plain, quiet UI: one typeface, one action colour (SDU blue), flat surfaces separated by a small
+ * step in tone. Status colours are used only for status.
+ */
+:root {
+  /* Logo only */
+  --brand-navy: #0e2a6b;
+  --brand-teal: #0e9f9a;
+  --brand-amber: #f2a11f;
+  --logo-ink: #0e2a6b;
+  --logo-paper: #ffffff;
+
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #eef0f3;
+  --border: #dde1e7;
+  --text: #14171c;
+  --muted: #5a6170;
+  --primary: #1b45b4;
+  --primary-fg: #ffffff;
+  --primary-soft: #e9eefb;
+  --ring: #1b45b4;
+  --critical: #c42020;
+  --high: #c2410c;
+  --medium: #8a5a00;
+  --low: #3d6b12;
+  --ok: #17803d;
+  --warn: #a35200;
+  /* Chart categorical slots (validated reference palette, fixed order) */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --grid: #e8e9ee;
+}
+
+.dark {
+  --logo-ink: #dbe5ff;
+  --logo-paper: #111317;
+  --brand-teal: #2cc5bd;
+
+  --bg: #0f1115;
+  --surface: #171a20;
+  --surface-2: #20242c;
+  --border: #2d323c;
+  --text: #e9ebef;
+  --muted: #9ba2ae;
+  --primary: #86a8ff;
+  --primary-fg: #0f1115;
+  --primary-soft: #1c2640;
+  --ring: #86a8ff;
+  --critical: #ff6b6b;
+  --high: #ff922b;
+  --medium: #f0c040;
+  --low: #a9e34b;
+  --ok: #51cf66;
+  --warn: #f0c040;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --grid: #262b35;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-fg: var(--primary-fg);
+  --color-primary-soft: var(--primary-soft);
+  --color-critical: var(--critical);
+  --color-high: var(--high);
+  --color-medium: var(--medium);
+  --color-low: var(--low);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Critical Kanban cards: pulsing red border (US3) */
+@keyframes pulse-border {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--critical) 60%, transparent); }
+  50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--critical) 20%, transparent); }
+}
+.pulse-critical {
+  border-color: var(--critical) !important;
+  animation: pulse-border 1.6s ease-in-out infinite;
+}
+
+/* Submission success animation (US1) */
+@keyframes pop-in {
+  0% { transform: scale(0.6); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes draw-check {
+  to { stroke-dashoffset: 0; }
+}
+.success-pop { animation: pop-in 0.25s ease-out both; }
+.success-check { stroke-dasharray: 48; stroke-dashoffset: 48; animation: draw-check 0.3s 0.1s ease-out forwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-critical, .success-pop { animation: none; }
+  .success-check { animation: none; stroke-dashoffset: 0; }
+}
+
+/* FAQ article bodies (sanitised HTML from the knowledge base) */
+.rich { line-height: 1.6; overflow-wrap: anywhere; }
+.rich > * + * { margin-top: 0.6em; }
+.rich h3 { font-size: 1.05rem; font-weight: 600; }
+.rich h4 { font-weight: 600; }
+.rich ul { list-style: disc; padding-left: 1.25rem; }
+.rich ol { list-style: decimal; padding-left: 1.25rem; }
+.rich a { color: var(--primary); text-decoration: underline; }
+.rich blockquote { border-left: 3px solid var(--border); padding-left: 0.75rem; color: var(--muted); }
+.rich code { background: var(--surface-2); border-radius: 4px; padding: 0 0.25rem; font-size: 0.9em; }
