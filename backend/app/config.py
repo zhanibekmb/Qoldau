@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -10,6 +11,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=BASE_DIR / ".env", env_prefix="QOLDAU_", extra="ignore")
 
     app_name: str = "Qoldau - Student Request Routing & Support"
+    environment: str = "development"
     # SQLite by default for local dev; docker-compose sets a PostgreSQL URL.
     database_url: str = f"sqlite:///{(BASE_DIR / 'qoldau.db').as_posix()}"
     secret_key: str = "change-me-in-production-please-32-bytes-min"
@@ -52,6 +54,19 @@ class Settings(BaseSettings):
     model_sync_seconds: int = 30  # workers pick up an activated / rolled back model within this window
     smart_reply_llm_enabled: bool = False  # optional LLM rewriter for smart replies (provider interface only)
     smart_reply_llm_provider: str = ""
+
+    @model_validator(mode="after")
+    def validate_production(self):
+        if self.environment not in ("development", "production"):
+            raise ValueError("QOLDAU_ENVIRONMENT must be development or production")
+        if self.environment == "production":
+            if self.secret_key == "change-me-in-production-please-32-bytes-min" or len(self.secret_key) < 32:
+                raise ValueError("Production requires a unique QOLDAU_SECRET_KEY of at least 32 characters")
+            if not self.database_url.startswith("postgresql+psycopg://"):
+                raise ValueError("Production requires a PostgreSQL QOLDAU_DATABASE_URL")
+            if not self.cors_origins or any(not origin.startswith("https://") for origin in self.cors_origins):
+                raise ValueError("Production QOLDAU_CORS_ORIGINS must contain HTTPS origins only")
+        return self
 
 
 @lru_cache
