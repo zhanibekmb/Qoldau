@@ -43,7 +43,8 @@ class Unit(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(120), unique=True)
     email: Mapped[str] = mapped_column(String(160), default="")
-    head_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", use_alter=True, ondelete="SET NULL"))
+    head_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", name="units_head_user_id_fkey",
+                                                       use_alter=True, ondelete="SET NULL"))
     working_hours: Mapped[str] = mapped_column(String(60), default="Mon-Fri 09:00-18:00")
     is_triage: Mapped[bool] = mapped_column(Boolean, default=False)
 

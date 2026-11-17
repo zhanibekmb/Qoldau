@@ -42,4 +42,4 @@ jobs:
         working-directory: backend
         run: alembic upgrade head
       - name: Run API suite on PostgreSQL
-        run: pytest backend/tests -q
+        run: pytest backend/tests -q --maxfail=1
