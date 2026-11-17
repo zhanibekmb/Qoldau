@@ -53,7 +53,7 @@ def upgrade() -> None:
     sa.Column('head_user_id', sa.Integer(), nullable=True),
     sa.Column('working_hours', sa.String(length=60), nullable=False),
     sa.Column('is_triage', sa.Boolean(), nullable=False),
-    sa.ForeignKeyConstraint(['head_user_id'], ['users.id'], ondelete='SET NULL', use_alter=True),
+    sa.ForeignKeyConstraint(['head_user_id'], ['users.id'], name='units_head_user_id_fkey', ondelete='SET NULL', use_alter=True),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('name')
     )
