@@ -13,6 +13,7 @@ def test_production_rejects_insecure_defaults():
                  cors_origins=["https://qoldau.example.org"])
     with pytest.raises(ValidationError, match="PostgreSQL"):
         Settings(environment="production", secret_key="x" * 32,
+                 database_url="sqlite:///local.db",
                  cors_origins=["https://qoldau.example.org"])
     with pytest.raises(ValidationError, match="HTTPS"):
         Settings(environment="production", secret_key="x" * 32,
