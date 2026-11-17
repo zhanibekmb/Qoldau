@@ -11,7 +11,7 @@ from ..db import get_db, utcnow
 from ..models import CSAT, Attachment, Escalation, Message, Notification, Request, Role, Status, Unit, User
 from ..security import current_user, require_roles, sign_file, verify_file_signature
 from ..services import notifications, suggestions, workflow
-from .common import get_request_or_404
+from .common import can_view, get_request_or_404
 
 router = APIRouter(tags=["messaging"])
 
@@ -161,7 +161,10 @@ def download(attachment_id: int, uid: int, exp: int, sig: str, db: Session = Dep
         raise HTTPException(403, "Link expired or invalid")
     att = db.get(Attachment, attachment_id)
     viewer = db.get(User, uid)
-    if att is None or viewer is None:
+    if att is None or viewer is None or not viewer.is_active:
+        raise HTTPException(404, "Not found")
+    req = db.get(Request, att.request_id)
+    if req is None or not can_view(db, viewer, req):
         raise HTTPException(404, "Not found")
     if att.is_internal and viewer.role not in Role.STAFF:
         raise HTTPException(404, "Not found")

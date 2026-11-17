@@ -84,6 +84,8 @@ def download(job_id: int, uid: int, exp: int, sig: str, db: Session = Depends(ge
     viewer = db.get(User, uid)
     if job is None or viewer is None or not viewer.is_active or job.status != "done":
         raise HTTPException(404, "Not found")
+    if viewer.role not in (Role.UNIT_HEAD, Role.ADMIN):
+        raise HTTPException(404, "Not found")
     if job.requested_by != viewer.id and viewer.role != Role.ADMIN:
         raise HTTPException(404, "Not found")
     path = reports.file_path(job)

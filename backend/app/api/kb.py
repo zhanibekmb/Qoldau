@@ -302,7 +302,7 @@ def delete_template(template_id: int, db: Session = Depends(get_db), user: User 
 def propose_faq(request_id: str, body: schemas.ProposeFAQIn, db: Session = Depends(get_db),
                 user: User = Depends(require_staff)):
     req = get_request_or_404(db, request_id, user)
-    require_staff_access(user, req)
+    require_staff_access(db, user, req)
     if req.status not in (Status.RESOLVED, Status.CLOSED):
         raise HTTPException(409, {"message": "Only resolved requests can become FAQ articles"})
     reply = embeddings.final_public_reply(db, req)
@@ -325,7 +325,7 @@ def propose_faq(request_id: str, body: schemas.ProposeFAQIn, db: Session = Depen
 def save_template(request_id: str, body: schemas.SaveTemplateIn, db: Session = Depends(get_db),
                   user: User = Depends(require_staff)):
     req = get_request_or_404(db, request_id, user)
-    require_staff_access(user, req)
+    require_staff_access(db, user, req)
     text = body.body
     if not text:
         reply = embeddings.final_public_reply(db, req)

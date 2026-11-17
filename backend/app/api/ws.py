@@ -61,7 +61,7 @@ async def ws_request(ws: WebSocket, request_id: str, token: str | None = None):
     db = SessionLocal()
     try:
         req = db.get(Request, request_id.upper())
-        allowed = req is not None and can_view(user, req)
+        allowed = req is not None and can_view(db, user, req)
     finally:
         db.close()
     if not allowed:

@@ -22,7 +22,7 @@ def similar(body: schemas.SimilarIn, db: Session = Depends(get_db), user: User =
             summary="Top-3 smart reply suggestions for a ticket (US19); never auto-sent")
 def smart_replies(request_id: str, db: Session = Depends(get_db), user: User = Depends(require_staff)):
     req = get_request_or_404(db, request_id, user)
-    require_staff_access(user, req)
+    require_staff_access(db, user, req)
     out = suggestions.smart_replies(db, req, user)
     db.commit()  # "shown" events
     return out
