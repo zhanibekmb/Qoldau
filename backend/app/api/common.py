@@ -13,30 +13,42 @@ def visibility_filter(q: Query, user: User, db: Session) -> Query:
         return q.filter(Request.student_id == user.id)
     if user.role == Role.ADMIN:
         return q
-    triage_ids = [u.id for u in db.query(Unit).filter_by(is_triage=True)]
-    return q.filter(or_(Request.unit_id == user.unit_id, Request.assignee_id == user.id,
-                        Request.status == Status.NEEDS_REVIEW, Request.unit_id.in_(triage_ids)))
+    conditions = [Request.assignee_id == user.id]
+    if user.unit_id is not None:
+        conditions.append(Request.unit_id == user.unit_id)
+    if can_triage(db, user):
+        conditions.append(Request.status == Status.NEEDS_REVIEW)
+    return q.filter(or_(*conditions))
 
 
-def can_view(user: User, req: Request) -> bool:
+def can_triage(db: Session, user: User) -> bool:
+    if user.role == Role.ADMIN:
+        return True
+    unit = db.get(Unit, user.unit_id) if user.unit_id else None
+    return user.role in (Role.AGENT, Role.UNIT_HEAD) and unit is not None and unit.is_triage
+
+
+def can_view(db: Session, user: User, req: Request) -> bool:
     if user.role == Role.STUDENT:
         return req.student_id == user.id
     if user.role == Role.ADMIN:
         return True
-    return (req.unit_id == user.unit_id or req.assignee_id == user.id or req.status == Status.NEEDS_REVIEW
-            or (req.unit is not None and req.unit.is_triage))
+    if user.role not in Role.STAFF:
+        return False
+    return ((user.unit_id is not None and req.unit_id == user.unit_id) or req.assignee_id == user.id
+            or (req.status == Status.NEEDS_REVIEW and can_triage(db, user)))
 
 
 def get_request_or_404(db: Session, request_id: str, user: User) -> Request:
     req = db.get(Request, request_id.strip().upper())
-    if req is None or not can_view(user, req):
+    if req is None or not can_view(db, user, req):
         # Do not reveal that another student's request exists.
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Request not found")
     return req
 
 
-def require_staff_access(user: User, req: Request) -> None:
-    if user.role not in Role.STAFF or not can_view(user, req):
+def require_staff_access(db: Session, user: User, req: Request) -> None:
+    if user.role not in Role.STAFF or not can_view(db, user, req):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Access denied")
 
 

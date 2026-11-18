@@ -11,7 +11,7 @@ from ..db import get_db, utcnow
 from ..models import Category, Message, Request, Role, RoutingLog, Status, Unit, User
 from ..security import current_user, require_roles, require_staff
 from ..services import notifications, pipeline, sla, suggestions, timeline, workflow
-from .common import card, detail, get_request_or_404, require_staff_access, visibility_filter
+from .common import can_triage, card, detail, get_request_or_404, require_staff_access, visibility_filter
 
 router = APIRouter(prefix="/requests", tags=["requests"])
 
@@ -81,7 +81,7 @@ def list_requests(
     if date_to:
         query = query.filter(Request.created_at < datetime.combine(date_to + timedelta(days=1), datetime.min.time()))
     if view == "triage":
-        if user.role == Role.STUDENT:
+        if not can_triage(db, user):
             raise HTTPException(403, "Access denied")
         query = query.filter(Request.status == Status.NEEDS_REVIEW)
     elif view == "escalated":
@@ -109,7 +109,10 @@ def board(db: Session = Depends(get_db), user: User = Depends(require_staff),
                                       joinedload(Request.assignee), joinedload(Request.student))
     target_unit = unit_id if user.role == Role.ADMIN else user.unit_id
     if target_unit:
-        query = query.filter(or_(Request.unit_id == target_unit, Request.assignee_id == user.id))
+        conditions = [Request.unit_id == target_unit, Request.assignee_id == user.id]
+        if user.role != Role.ADMIN and can_triage(db, user):
+            conditions.append(Request.status == Status.NEEDS_REVIEW)
+        query = query.filter(or_(*conditions))
     elif user.role != Role.ADMIN:
         query = query.filter(Request.assignee_id == user.id)
     if mine:
@@ -142,7 +145,7 @@ def get_timeline(request_id: str, db: Session = Depends(get_db), user: User = De
 def change_status(request_id: str, body: schemas.StatusPatch, db: Session = Depends(get_db),
                   user: User = Depends(require_staff)):
     req = get_request_or_404(db, request_id, user)
-    require_staff_access(user, req)
+    require_staff_access(db, user, req)
     target = body.status
     text = schemas.sanitize(body.message) if body.message else None
     if target == Status.IN_PROGRESS and req.assignee_id is None and user.role == Role.AGENT:
@@ -167,7 +170,7 @@ def change_status(request_id: str, body: schemas.StatusPatch, db: Session = Depe
 def assign(request_id: str, body: schemas.AssignIn, db: Session = Depends(get_db),
            user: User = Depends(require_staff)):
     req = get_request_or_404(db, request_id, user)
-    require_staff_access(user, req)
+    require_staff_access(db, user, req)
     agent = db.get(User, body.assignee_id)
     if not agent or agent.role not in (Role.AGENT, Role.UNIT_HEAD) or not agent.is_active:
         raise HTTPException(422, "Assignee must be an active agent or unit head")
@@ -192,7 +195,7 @@ def assign(request_id: str, body: schemas.AssignIn, db: Session = Depends(get_db
 def override(request_id: str, body: schemas.OverrideIn, db: Session = Depends(get_db),
              user: User = Depends(require_staff)):
     req = get_request_or_404(db, request_id, user)
-    require_staff_access(user, req)
+    require_staff_access(db, user, req)
     if body.category_id is None and body.priority is None and body.unit_id is None:
         raise HTTPException(422, "Nothing to override")
     if body.category_id and not db.get(Category, body.category_id):
@@ -211,7 +214,7 @@ def override(request_id: str, body: schemas.OverrideIn, db: Session = Depends(ge
 @router.post("/{request_id}/step", response_model=schemas.RequestDetail, summary="Advance workflow template step")
 def advance_step(request_id: str, db: Session = Depends(get_db), user: User = Depends(require_staff)):
     req = get_request_or_404(db, request_id, user)
-    require_staff_access(user, req)
+    require_staff_access(db, user, req)
     try:
         workflow.advance_step(db, req, user)
     except workflow.TransitionNotAllowed:
