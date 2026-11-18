@@ -3,16 +3,18 @@ import logging
 from contextlib import asynccontextmanager
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import HTTPException
 from sqlalchemy import text
+from fastapi.responses import JSONResponse
 
 from .api import admin, ai, analytics, auth, export, kb, messages, meta, requests, suggestions, ws
 from .config import get_settings
 from .db import SessionLocal
 from .ml import embeddings, training
 from .ml.classifier import load_or_train
+from .rate_limit import RateLimitExceeded, enforce_limit, identity, policy_for
 from .services import jobs, sla
 from .services.realtime import hub
 
@@ -63,6 +65,23 @@ def create_app() -> FastAPI:
     app = FastAPI(title=settings.app_name, version="1.4.0", lifespan=lifespan,
                   description="AI Student Request Routing & Support System - Sprints 1-4 (US1-US21).",
                   docs_url="/api/docs", openapi_url="/api/openapi.json")
+    @app.middleware("http")
+    async def limit_requests(request: Request, call_next):
+        policy = policy_for(request, settings) if settings.rate_limits_enabled else None
+        if policy is None:
+            return await call_next(request)
+        subject = identity(request, settings, policy.by_ip)
+        try:
+            count, _ = await asyncio.to_thread(
+                enforce_limit, policy.scope, subject, policy.limit, policy.seconds)
+        except RateLimitExceeded as exc:
+            return JSONResponse({"detail": "Rate limit exceeded"}, status_code=429,
+                                headers={"Retry-After": str(exc.retry_after)})
+        response = await call_next(request)
+        response.headers["X-RateLimit-Limit"] = str(policy.limit)
+        response.headers["X-RateLimit-Remaining"] = str(max(0, policy.limit - count))
+        return response
+
     app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_credentials=True,
                        allow_methods=["*"], allow_headers=["*"])
     for r in (auth, requests, ai, suggestions, messages, analytics, export, admin, kb, meta):
