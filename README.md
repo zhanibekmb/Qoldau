@@ -2,7 +2,7 @@
 
 # Qoldau — AI Student Request Routing & Support System (SDU University)
 
-> **Sprint 5 review:** This `sprint5/demo` branch combines the five Sprint 5 implementation PRs and the review presentation. Start with the [step-by-step Russian walkthrough](docs/SPRINT5_WALKTHROUGH_RU.md), then open the [Sprint 5 PDF](presentations/Qoldau_Sprint5_Review.pdf) or [editable PPTX](presentations/Qoldau_Sprint5_Review.pptx). The local demo starts with [`scripts/sprint5_demo.command`](scripts/sprint5_demo.command). The `main` branch still contains Sprint 4 because the Sprint 5 PRs have not been merged.
+> **Sprint 5 review:** This `sprint5/demo` branch combines the five Sprint 5 implementation PRs and the review presentation in [one draft preview PR](https://github.com/zhanibekmb/Qoldau/pull/12). Start with the [step-by-step Russian walkthrough](docs/SPRINT5_WALKTHROUGH_RU.md), then open the [Sprint 5 PDF](presentations/Qoldau_Sprint5_Review.pdf) or [editable PPTX](presentations/Qoldau_Sprint5_Review.pptx). The local demo starts with [`scripts/sprint5_demo.command`](scripts/sprint5_demo.command). The `main` branch still contains Sprint 4 because the Sprint 5 PRs have not been merged.
 
 Students submit any request in free text (Kazakh, Russian or English). The system detects the category and
 urgency, routes the request to the responsible university unit and agent, tracks it with SLA timers through a
