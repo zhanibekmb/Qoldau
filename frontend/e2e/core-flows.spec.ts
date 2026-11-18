@@ -101,6 +101,25 @@ test("admin creates and removes a configuration keyword", async ({ page }) => {
   await expect(row).toHaveCount(0);
 });
 
+test("admin configuration follows Russian and Kazakh language switches", async ({ page }) => {
+  await signIn(page, "admin@qoldau.edu.kz");
+  await page.goto("/admin");
+
+  await page.getByRole("combobox", { name: "Language" }).selectOption("ru");
+  await page.getByRole("tab", { name: "Ключевые слова срочности" }).click();
+  await page.getByRole("button", { name: "Добавить" }).click();
+  const russianEditor = page.getByRole("dialog", { name: "Добавить: Ключевые слова срочности" });
+  await expect(russianEditor.getByLabel("Ключевое слово")).toBeVisible();
+  await russianEditor.getByRole("button", { name: "Отмена" }).click();
+
+  await page.getByRole("combobox", { name: "Язык" }).selectOption("kz");
+  await page.getByRole("tab", { name: "Шұғылдық кілт сөздері" }).click();
+  await page.getByRole("button", { name: "Қосу" }).click();
+  const kazakhEditor = page.getByRole("dialog", { name: "Қосу: Шұғылдық кілт сөздері" });
+  await expect(kazakhEditor.getByLabel("Кілт сөз")).toBeVisible();
+  await kazakhEditor.getByRole("button", { name: "Бас тарту" }).click();
+});
+
 test("admin exports analytics and downloads the report", async ({ page, request }) => {
   await signIn(page, "admin@qoldau.edu.kz");
   await page.goto("/analytics");

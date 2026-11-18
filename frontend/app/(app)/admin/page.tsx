@@ -27,13 +27,59 @@ interface Entity {
   canDelete?: boolean;
 }
 
-const WORKFLOWS = ["standard", "approval", "document", "urgent", "triage"].map((w) => ({ value: w, label: w }));
-const PRIORITIES = ["Critical", "High", "Medium", "Low"].map((p) => ({ value: p, label: p }));
-const ROLES = ["student", "agent", "unit_head", "admin"].map((r) => ({ value: r, label: r }));
+const COPY = {
+  en: {
+    routingRules: "Routing rules", categories: "Categories", units: "Units", slaPolicies: "SLA policies",
+    urgencyKeywords: "Urgency keywords", usersRoles: "Users & roles", auditLog: "Audit log",
+    category: "Category", unit: "Unit", active: "Active", name: "Name", defaultUnit: "Default unit",
+    workflow: "Workflow", priorityWeight: "Priority weight (0–60)", email: "Email", head: "Head",
+    workingHours: "Working hours", triageUnit: "Triage unit", priority: "Priority",
+    firstResponse: "First response (h)", resolution: "Resolution (h)", workingHoursOnly: "Working hours only",
+    keyword: "Keyword", weight: "Weight (−30 to 60)", forcesCritical: "Forces Critical",
+    language: "Language", role: "Role", passwordKeep: "Password (leave empty to keep)",
+    when: "When", who: "Who", action: "Action", entity: "Entity", change: "Change (old → new)",
+    add: "Add", edit: "Edit", delete: "Delete", save: "Save", cancel: "Cancel",
+    workflows: { standard: "Standard", approval: "Approval", document: "Document", urgent: "Urgent", triage: "Triage" },
+    roles: { student: "Student", agent: "Agent", unit_head: "Unit head", admin: "Admin" },
+  },
+  ru: {
+    routingRules: "Правила маршрутизации", categories: "Категории", units: "Подразделения", slaPolicies: "Правила SLA",
+    urgencyKeywords: "Ключевые слова срочности", usersRoles: "Пользователи и роли", auditLog: "Журнал изменений",
+    category: "Категория", unit: "Подразделение", active: "Активно", name: "Название", defaultUnit: "Подразделение по умолчанию",
+    workflow: "Процесс", priorityWeight: "Вес приоритета (0–60)", email: "Эл. почта", head: "Руководитель",
+    workingHours: "Рабочие часы", triageUnit: "Подразделение первичной обработки", priority: "Приоритет",
+    firstResponse: "Первый ответ (ч)", resolution: "Решение (ч)", workingHoursOnly: "Только рабочие часы",
+    keyword: "Ключевое слово", weight: "Вес (от −30 до 60)", forcesCritical: "Принудительно критический",
+    language: "Язык", role: "Роль", passwordKeep: "Пароль (оставьте пустым, чтобы не менять)",
+    when: "Когда", who: "Кто", action: "Действие", entity: "Объект", change: "Изменение (было → стало)",
+    add: "Добавить", edit: "Изменить", delete: "Удалить", save: "Сохранить", cancel: "Отмена",
+    workflows: { standard: "Стандартный", approval: "Согласование", document: "Документ", urgent: "Срочный", triage: "Первичная обработка" },
+    roles: { student: "Студент", agent: "Сотрудник", unit_head: "Руководитель", admin: "Администратор" },
+  },
+  kz: {
+    routingRules: "Бағыттау ережелері", categories: "Санаттар", units: "Бөлімдер", slaPolicies: "SLA ережелері",
+    urgencyKeywords: "Шұғылдық кілт сөздері", usersRoles: "Пайдаланушылар мен рөлдер", auditLog: "Өзгерістер журналы",
+    category: "Санат", unit: "Бөлім", active: "Белсенді", name: "Атауы", defaultUnit: "Әдепкі бөлім",
+    workflow: "Үдеріс", priorityWeight: "Басымдық салмағы (0–60)", email: "Эл. пошта", head: "Басшы",
+    workingHours: "Жұмыс уақыты", triageUnit: "Алғашқы қарау бөлімі", priority: "Басымдық",
+    firstResponse: "Алғашқы жауап (сағ)", resolution: "Шешу (сағ)", workingHoursOnly: "Тек жұмыс уақыты",
+    keyword: "Кілт сөз", weight: "Салмақ (−30–60)", forcesCritical: "Міндетті түрде шұғыл",
+    language: "Тіл", role: "Рөл", passwordKeep: "Құпиясөз (өзгертпеу үшін бос қалдырыңыз)",
+    when: "Қашан", who: "Кім", action: "Әрекет", entity: "Нысан", change: "Өзгеріс (бұрын → кейін)",
+    add: "Қосу", edit: "Өңдеу", delete: "Жою", save: "Сақтау", cancel: "Бас тарту",
+    workflows: { standard: "Стандартты", approval: "Бекіту", document: "Құжат", urgent: "Шұғыл", triage: "Алғашқы қарау" },
+    roles: { student: "Студент", agent: "Қызметкер", unit_head: "Бөлім басшысы", admin: "Әкімші" },
+  },
+} as const;
+
+const WORKFLOWS = ["standard", "approval", "document", "urgent", "triage"] as const;
+const PRIORITIES = ["Critical", "High", "Medium", "Low"] as const;
+const ROLES = ["student", "agent", "unit_head", "admin"] as const;
 const LANGS = ["en", "ru", "kz"].map((l) => ({ value: l, label: l.toUpperCase() }));
 
 function AdminView() {
-  const { lang } = useI18n();
+  const { lang, t } = useI18n();
+  const c = COPY[lang];
   const [units, setUnits] = useState<Row[]>([]);
   const [cats, setCats] = useState<Row[]>([]);
   const [users, setUsers] = useState<Row[]>([]);
@@ -47,6 +93,9 @@ function AdminView() {
 
   const unitOpts = () => [{ value: "", label: "—" }, ...units.map((u) => ({ value: u.id, label: String(u.name) }))];
   const catOpts = () => cats.map((c) => ({ value: c.id, label: String(c.name) }));
+  const workflowOpts = () => WORKFLOWS.map((w) => ({ value: w, label: c.workflows[w] }));
+  const priorityOpts = () => PRIORITIES.map((p) => ({ value: p, label: t(`prio.${p}`) }));
+  const roleOpts = () => ROLES.map((r) => ({ value: r, label: c.roles[r] }));
   const headOpts = () => [
     { value: "", label: "—" },
     ...users.filter((u) => u.role === "unit_head" || u.role === "admin").map((u) => ({ value: u.id, label: String(u.name) })),
@@ -55,76 +104,76 @@ function AdminView() {
   const ENTITIES: Entity[] = [
     {
       key: "routing-rules",
-      label: "Routing rules",
+      label: c.routingRules,
       path: "/admin/routing-rules",
       canDelete: true,
       fields: [
-        { key: "category_id", label: "Category", type: "select", options: catOpts },
-        { key: "unit_id", label: "Unit", type: "select", options: unitOpts },
-        { key: "is_active", label: "Active", type: "bool", default: true },
+        { key: "category_id", label: c.category, type: "select", options: catOpts },
+        { key: "unit_id", label: c.unit, type: "select", options: unitOpts },
+        { key: "is_active", label: c.active, type: "bool", default: true },
       ],
     },
     {
       key: "categories",
-      label: "Categories",
+      label: c.categories,
       path: "/admin/categories",
       canDelete: true,
       fields: [
-        { key: "name", label: "Name", type: "text" },
-        { key: "unit_id", label: "Default unit", type: "select", options: unitOpts },
-        { key: "default_workflow", label: "Workflow", type: "select", options: () => WORKFLOWS, default: "standard" },
-        { key: "base_priority_weight", label: "Priority weight (0-60)", type: "number", default: 30 },
-        { key: "is_active", label: "Active", type: "bool", default: true },
+        { key: "name", label: c.name, type: "text" },
+        { key: "unit_id", label: c.defaultUnit, type: "select", options: unitOpts },
+        { key: "default_workflow", label: c.workflow, type: "select", options: workflowOpts, default: "standard" },
+        { key: "base_priority_weight", label: c.priorityWeight, type: "number", default: 30 },
+        { key: "is_active", label: c.active, type: "bool", default: true },
       ],
     },
     {
       key: "units",
-      label: "Units",
+      label: c.units,
       path: "/admin/units",
       canDelete: true,
       fields: [
-        { key: "name", label: "Name", type: "text" },
-        { key: "email", label: "Email", type: "text", default: "" },
-        { key: "head_user_id", label: "Head", type: "select", options: headOpts },
-        { key: "working_hours", label: "Working hours", type: "text", default: "Mon-Fri 09:00-18:00" },
-        { key: "is_triage", label: "Triage unit", type: "bool", default: false },
+        { key: "name", label: c.name, type: "text" },
+        { key: "email", label: c.email, type: "text", default: "" },
+        { key: "head_user_id", label: c.head, type: "select", options: headOpts },
+        { key: "working_hours", label: c.workingHours, type: "text", default: "Mon-Fri 09:00-18:00" },
+        { key: "is_triage", label: c.triageUnit, type: "bool", default: false },
       ],
     },
     {
       key: "sla-policies",
-      label: "SLA policies",
+      label: c.slaPolicies,
       path: "/admin/sla-policies",
       fields: [
-        { key: "priority", label: "Priority", type: "select", options: () => PRIORITIES },
-        { key: "first_response_hours", label: "First response (h)", type: "number" },
-        { key: "resolution_hours", label: "Resolution (h)", type: "number" },
-        { key: "use_working_hours", label: "Working hours only", type: "bool", default: false },
+        { key: "priority", label: c.priority, type: "select", options: priorityOpts },
+        { key: "first_response_hours", label: c.firstResponse, type: "number" },
+        { key: "resolution_hours", label: c.resolution, type: "number" },
+        { key: "use_working_hours", label: c.workingHoursOnly, type: "bool", default: false },
       ],
     },
     {
       key: "keywords",
-      label: "Urgency keywords",
+      label: c.urgencyKeywords,
       path: "/admin/keywords",
       canDelete: true,
       fields: [
-        { key: "keyword", label: "Keyword", type: "text" },
-        { key: "weight", label: "Weight (-30..60)", type: "number", default: 10 },
-        { key: "is_critical", label: "Forces Critical", type: "bool", default: false },
-        { key: "language", label: "Language", type: "select", options: () => LANGS, default: "en" },
+        { key: "keyword", label: c.keyword, type: "text" },
+        { key: "weight", label: c.weight, type: "number", default: 10 },
+        { key: "is_critical", label: c.forcesCritical, type: "bool", default: false },
+        { key: "language", label: c.language, type: "select", options: () => LANGS, default: "en" },
       ],
     },
     {
       key: "users",
-      label: "Users & roles",
+      label: c.usersRoles,
       path: "/admin/users",
       fields: [
-        { key: "name", label: "Name", type: "text" },
-        { key: "email", label: "Email", type: "text" },
-        { key: "role", label: "Role", type: "select", options: () => ROLES, default: "student" },
-        { key: "unit_id", label: "Unit", type: "select", options: unitOpts },
-        { key: "language", label: "Language", type: "select", options: () => LANGS, default: "en" },
-        { key: "is_active", label: "Active", type: "bool", default: true },
-        { key: "password", label: "Password (leave empty to keep)", type: "password", hideInTable: true },
+        { key: "name", label: c.name, type: "text" },
+        { key: "email", label: c.email, type: "text" },
+        { key: "role", label: c.role, type: "select", options: roleOpts, default: "student" },
+        { key: "unit_id", label: c.unit, type: "select", options: unitOpts },
+        { key: "language", label: c.language, type: "select", options: () => LANGS, default: "en" },
+        { key: "is_active", label: c.active, type: "bool", default: true },
+        { key: "password", label: c.passwordKeep, type: "password", hideInTable: true },
       ],
     },
   ];
@@ -178,7 +227,7 @@ function AdminView() {
       load();
       loadRefs();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed");
+      setError(err instanceof ApiError ? err.message : t("common.error"));
     } finally {
       setBusy(false);
     }
@@ -191,7 +240,7 @@ function AdminView() {
       load();
       loadRefs();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed");
+      setError(err instanceof ApiError ? err.message : t("common.error"));
     }
   }
 
@@ -208,9 +257,9 @@ function AdminView() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Configuration</h1>
+      <h1 className="text-2xl font-bold">{t("nav.admin")}</h1>
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1" role="tablist">
-        {[...ENTITIES.map((e) => [e.key, e.label]), ["audit", "Audit log"]].map(([k, l]) => (
+        {[...ENTITIES.map((e) => [e.key, e.label]), ["audit", c.auditLog]].map(([k, l]) => (
           <Button key={k} role="tab" aria-selected={tab === k} size="sm" variant={tab === k ? "primary" : "secondary"} onClick={() => setTab(k)} className="shrink-0">
             {l}
           </Button>
@@ -226,11 +275,11 @@ function AdminView() {
             <table className="w-full text-sm">
               <thead className="bg-surface-2 text-left text-xs text-muted">
                 <tr>
-                  <th className="p-3 font-medium">When</th>
-                  <th className="p-3 font-medium">Who</th>
-                  <th className="p-3 font-medium">Action</th>
-                  <th className="p-3 font-medium">Entity</th>
-                  <th className="p-3 font-medium">Change (old → new)</th>
+                  <th className="p-3 font-medium">{c.when}</th>
+                  <th className="p-3 font-medium">{c.who}</th>
+                  <th className="p-3 font-medium">{c.action}</th>
+                  <th className="p-3 font-medium">{c.entity}</th>
+                  <th className="p-3 font-medium">{c.change}</th>
                 </tr>
               </thead>
               <tbody>
@@ -268,7 +317,7 @@ function AdminView() {
             <div className="flex items-center justify-between p-3">
               <h2 className="font-semibold">{entity.label}</h2>
               <Button size="sm" onClick={() => open("new")}>
-                <Plus className="h-4 w-4" /> Add
+                <Plus className="h-4 w-4" /> {c.add}
               </Button>
             </div>
             {!rows ? (
@@ -298,11 +347,11 @@ function AdminView() {
                           </td>
                         ))}
                       <td className="whitespace-nowrap p-1 text-right">
-                        <button aria-label="Edit" className="inline-grid h-11 w-11 place-items-center rounded-lg hover:bg-surface-2" onClick={() => open(r)}>
+                        <button aria-label={c.edit} className="inline-grid h-11 w-11 place-items-center rounded-lg hover:bg-surface-2" onClick={() => open(r)}>
                           <Pencil className="h-4 w-4" />
                         </button>
                         {entity.canDelete && (
-                          <button aria-label="Delete" className="inline-grid h-11 w-11 place-items-center rounded-lg text-critical hover:bg-surface-2" onClick={() => remove(r)}>
+                          <button aria-label={c.delete} className="inline-grid h-11 w-11 place-items-center rounded-lg text-critical hover:bg-surface-2" onClick={() => remove(r)}>
                             <Trash2 className="h-4 w-4" />
                           </button>
                         )}
@@ -316,7 +365,7 @@ function AdminView() {
         )
       )}
 
-      <Modal open={!!editing} onClose={() => setEditing(null)} title={editing === "new" ? `Add: ${entity?.label}` : `Edit: ${entity?.label}`}>
+      <Modal open={!!editing} onClose={() => setEditing(null)} title={editing === "new" ? `${c.add}: ${entity?.label}` : `${c.edit}: ${entity?.label}`}>
         <form onSubmit={save} className="space-y-3">
           {entity?.fields.map((f) => (
             <div key={f.key}>
@@ -352,10 +401,10 @@ function AdminView() {
           <FieldError>{error}</FieldError>
           <div className="flex gap-2">
             <Button type="submit" loading={busy}>
-              Save
+              {c.save}
             </Button>
             <Button type="button" variant="ghost" onClick={() => setEditing(null)}>
-              Cancel
+              {c.cancel}
             </Button>
           </div>
         </form>
