@@ -6,10 +6,19 @@ Students submit any request in free text (Kazakh, Russian or English). The syste
 urgency, routes the request to the responsible university unit and agent, tracks it with SLA timers through a
 defined workflow, and reports on it in an analytics dashboard.
 
-This repository implements **Sprints 1–4 (US1–US22)** from `Sprint.xlsx`. Sprint 4 added report export, AI
+This repository implements **Sprints 1–5**. Sprint 4 added report export, AI
 retraining with model management, smart replies for agents, FAQ / similar-request suggestions for students and a
-knowledge base (see `docs/SPRINT4_PLAN.md`, `docs/SPRINT4_CHANGELOG.md`, `docs/SPRINT4_DEMO.md`). Sprint 5 items
-(full RBAC audit, rate limiting, E2E suite, production deployment) are not built yet.
+knowledge base (see `docs/SPRINT4_PLAN.md`, `docs/SPRINT4_CHANGELOG.md`, `docs/SPRINT4_DEMO.md`). Sprint 5 added
+access-control checks, shared API rate limits, six browser scenarios, PostgreSQL validation, deployment
+preparation, admin localization, and a documented priority-model decision. Public deployment is a separate step.
+
+## Sprint 5 review
+
+- [Backlog and roadmap](sprints/Sprint5.xlsx): five completed issues and the remaining public-launch gate.
+- [Presentation PDF](presentations/Qoldau_Sprint5_Review.pdf) and [editable PPTX](presentations/Qoldau_Sprint5_Review.pptx).
+- [English defense script and answers](docs/SPRINT5_DEFENSE.md) and [local demo instructions](docs/SPRINT5_DEMO.md).
+- Implementation: merged PRs [#6](https://github.com/zhanibekmb/Qoldau/pull/6), [#7](https://github.com/zhanibekmb/Qoldau/pull/7), [#8](https://github.com/zhanibekmb/Qoldau/pull/8), [#9](https://github.com/zhanibekmb/Qoldau/pull/9), and [#10](https://github.com/zhanibekmb/Qoldau/pull/10). Presentation: merged [#11](https://github.com/zhanibekmb/Qoldau/pull/11).
+- Local demonstration on this Mac: open [`scripts/sprint5_demo.command`](scripts/sprint5_demo.command). Its database is isolated under `~/.cache/qoldau-sprint5-demo`.
 
 ## Brand & landing page
 
@@ -49,15 +58,14 @@ Demo accounts (password `Qoldau123!`):
 
 Unit slugs: `deans, registrar, finance, it, housing, library, medical, international, triage`.
 
-An existing Sprints 1–3 database is upgraded in place: `python -m app.seed` runs migration 0002 and adds the
-knowledge base without touching existing requests.
+An existing database is upgraded in place by Alembic migrations when running `python -m app.seed`.
 
 **Docker:** `docker compose up --build` starts PostgreSQL, the API (it migrates and seeds on first start) and the web app.
 
 ## Tests and model evaluation
 
 ```bash
-cd backend && python -m pytest -q          # 58 tests mapped to the USxQATest Given/When/Then scenarios
+cd backend && python -m pytest -q          # 68 backend tests in the Sprint 5 integrated check
 python -m app.ml.evaluate                  # accuracy / macro F1 / routing correctness -> docs/model-evaluation.md
 python -m app.ml.training [--force]        # retrain from agent feedback (same as "Retrain now")
 python -m app.ml.embeddings --reindex      # rebuild the FAQ / template / resolved-case vector index
