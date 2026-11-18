@@ -2,14 +2,15 @@
 
 # Qoldau — AI Student Request Routing & Support System (SDU University)
 
+> **Sprint 5 review:** This `sprint5/demo` branch combines the five Sprint 5 implementation PRs and the review presentation. Start with the [step-by-step Russian walkthrough](docs/SPRINT5_WALKTHROUGH_RU.md), then open the [Sprint 5 PDF](presentations/Qoldau_Sprint5_Review.pdf) or [editable PPTX](presentations/Qoldau_Sprint5_Review.pptx). The local demo starts with [`scripts/sprint5_demo.command`](scripts/sprint5_demo.command). The `main` branch still contains Sprint 4 because the Sprint 5 PRs have not been merged.
+
 Students submit any request in free text (Kazakh, Russian or English). The system detects the category and
 urgency, routes the request to the responsible university unit and agent, tracks it with SLA timers through a
 defined workflow, and reports on it in an analytics dashboard.
 
-This repository implements **Sprints 1–4 (US1–US22)** from `Sprint.xlsx`. Sprint 4 added report export, AI
+The `main` branch implements **Sprints 1–4 (US1–US22)** from `Sprint.xlsx`; this review branch also contains the Sprint 5 implementation. Sprint 4 added report export, AI
 retraining with model management, smart replies for agents, FAQ / similar-request suggestions for students and a
-knowledge base (see `docs/SPRINT4_PLAN.md`, `docs/SPRINT4_CHANGELOG.md`, `docs/SPRINT4_DEMO.md`). Sprint 5 items
-(full RBAC audit, rate limiting, E2E suite, production deployment) are not built yet.
+knowledge base (see `docs/SPRINT4_PLAN.md`, `docs/SPRINT4_CHANGELOG.md`, `docs/SPRINT4_DEMO.md`). Sprint 5 adds an RBAC audit, shared API rate limits, browser tests, PostgreSQL and deployment preparation, admin localization, and a documented priority-model decision. Public deployment and remaining hardening are separate work.
 
 ## Brand & landing page
 
