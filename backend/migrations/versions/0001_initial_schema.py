@@ -53,7 +53,7 @@ def upgrade() -> None:
     sa.Column('head_user_id', sa.Integer(), nullable=True),
     sa.Column('working_hours', sa.String(length=60), nullable=False),
     sa.Column('is_triage', sa.Boolean(), nullable=False),
-    sa.ForeignKeyConstraint(['head_user_id'], ['users.id'], ondelete='SET NULL', use_alter=True),
+    sa.ForeignKeyConstraint(['head_user_id'], ['users.id'], name='units_head_user_id_fkey', ondelete='SET NULL', use_alter=True),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('name')
     )
@@ -92,6 +92,10 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['unit_id'], ['units.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
+    # The units -> users link is deferred because users also references units.
+    # Alembic op.create_table does not emit a use_alter FK automatically.
+    if op.get_bind().dialect.name == 'postgresql':
+        op.create_foreign_key('units_head_user_id_fkey', 'units', 'users', ['head_user_id'], ['id'], ondelete='SET NULL')
     with op.batch_alter_table('users', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_users_email'), ['email'], unique=True)
         batch_op.create_index(batch_op.f('ix_users_role'), ['role'], unique=False)
@@ -369,6 +373,8 @@ def downgrade() -> None:
         batch_op.drop_index(batch_op.f('ix_users_role'))
         batch_op.drop_index(batch_op.f('ix_users_email'))
 
+    if op.get_bind().dialect.name == 'postgresql':
+        op.drop_constraint('units_head_user_id_fkey', 'units', type_='foreignkey')
     op.drop_table('users')
     op.drop_table('categories')
     op.drop_table('urgency_keywords')
