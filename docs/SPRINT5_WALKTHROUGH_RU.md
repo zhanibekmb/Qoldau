@@ -2,6 +2,8 @@
 
 **Начни с [одного общего PR #12](https://github.com/zhanibekmb/Qoldau/pull/12) или [ветки sprint5/demo](https://github.com/zhanibekmb/Qoldau/tree/sprint5/demo).** Там собраны пять отдельных PR с кодом, презентация и локальный запуск. PR #12 оставлен черновиком только для демонстрации; сливать его вместо отдельных PR не нужно. На главной странице GitHub по умолчанию выбрана ветка `main`; там остаётся Спринт 4, поскольку мы договорились не сливать PR самостоятельно.
 
+В папке [sprints](https://github.com/zhanibekmb/Qoldau/tree/sprint5/demo/sprints) этой ветки есть [Sprint5.xlsx](https://github.com/zhanibekmb/Qoldau/blob/sprint5/demo/sprints/Sprint5.xlsx) с пятью задачами, доказательствами и дорожной картой. В `main` его пока не будет видно. На приватной доске задачи теперь в статусе **Ready for Review**: реализация и CI завершены, отдельные PR ждут просмотра. Преподаватель сможет увидеть доску с твоего экрана; PR, файл плана и презентацию можно открыть по ссылкам.
+
 ## Подготовка перед выступлением
 
 1. Скачай или открой [PDF презентации](https://github.com/zhanibekmb/Qoldau/blob/sprint5/demo/presentations/Qoldau_Sprint5_Review.pdf) на весь экран. [PPTX](https://github.com/zhanibekmb/Qoldau/blob/sprint5/demo/presentations/Qoldau_Sprint5_Review.pptx) — редактируемая версия с заметками к слайдам.
@@ -12,7 +14,7 @@
 
 | Время | Что открыть | Что сказать |
 |---|---|---|
-| 0:00–0:40 | Слайды 1–4 и [доска Спринта 5](https://github.com/users/berikside/projects/2/views/1) | «У нас пять задач. Реализация каждой вынесена в отдельный PR; в `main` пока ничего не слито». На доске задачи остаются `In Progress` именно из-за открытых PR. |
+| 0:00–0:40 | Слайды 1–4, [Sprint5.xlsx](https://github.com/zhanibekmb/Qoldau/blob/sprint5/demo/sprints/Sprint5.xlsx) и [доска Спринта 5](https://github.com/users/berikside/projects/2/views/1) | «У нас пять задач. Реализация каждой вынесена в отдельный PR; в `main` пока ничего не слито». На доске задачи в `Ready for Review`, а не в `Done`, потому что PR ждут просмотра. |
 | 0:40–2:00 | Слайды 5–6 и PR [#6](https://github.com/zhanibekmb/Qoldau/pull/6), [#7](https://github.com/zhanibekmb/Qoldau/pull/7) | «Проверили доступ студента, агента и администратора к API, WebSocket и файлам. Добавили общие для API-воркеров лимиты с ответом 429». В PR нажми `Files changed` или `Checks`. |
 | 2:00–3:00 | Слайд 7 и PR [#9](https://github.com/zhanibekmb/Qoldau/pull/9) | «Шесть сценариев Playwright проходят в браузере и в GitHub Actions: студент, агент, база знаний, настройки, языки, экспорт». Открой зелёные `Checks`. |
 | 3:00–4:00 | Слайд 8 и PR [#8](https://github.com/zhanibekmb/Qoldau/pull/8) | «Миграции и backend проверяются на PostgreSQL в CI; подготовлены Compose, HTTPS и инструкции развёртывания. Это ещё не публичный сервер». |
