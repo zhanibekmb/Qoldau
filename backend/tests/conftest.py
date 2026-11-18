@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 
 _tmp = Path(tempfile.mkdtemp(prefix="qoldau-test-"))
-os.environ["QOLDAU_DATABASE_URL"] = f"sqlite:///{(_tmp / 'test.db').as_posix()}"
+os.environ.setdefault("QOLDAU_DATABASE_URL", f"sqlite:///{(_tmp / 'test.db').as_posix()}")
 os.environ["QOLDAU_SCHEDULER_ENABLED"] = "false"
 os.environ["QOLDAU_UPLOAD_DIR"] = str(_tmp / "uploads")
 os.environ["QOLDAU_EXPORT_DIR"] = str(_tmp / "exports")

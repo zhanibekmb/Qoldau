@@ -5,6 +5,8 @@ from contextlib import asynccontextmanager
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import HTTPException
+from sqlalchemy import text
 from fastapi.responses import JSONResponse
 
 from .api import admin, ai, analytics, auth, export, kb, messages, meta, requests, suggestions, ws
@@ -89,6 +91,15 @@ def create_app() -> FastAPI:
     @app.get("/api/health", tags=["meta"])
     def health():
         return {"status": "ok"}
+
+    @app.get("/api/ready", tags=["meta"])
+    def ready():
+        try:
+            with SessionLocal() as db:
+                db.execute(text("SELECT 1"))
+        except Exception:
+            raise HTTPException(503, "Database unavailable")
+        return {"status": "ready"}
 
     return app
 
