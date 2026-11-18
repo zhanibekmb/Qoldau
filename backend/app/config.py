@@ -53,6 +53,19 @@ class Settings(BaseSettings):
     smart_reply_llm_enabled: bool = False  # optional LLM rewriter for smart replies (provider interface only)
     smart_reply_llm_provider: str = ""
 
+    # Sprint 5. Counters are stored in the application database and shared by API workers.
+    rate_limits_enabled: bool = True
+    rate_limit_login_ip_per_minute: int = 60
+    rate_limit_login_account_per_minute: int = 10
+    rate_limit_refresh_per_minute: int = 60
+    rate_limit_write_per_hour: int = 120
+    rate_limit_message_per_minute: int = 60
+    rate_limit_ai_per_minute: int = 60
+    rate_limit_export_per_hour: int = 10
+    rate_limit_retrain_per_hour: int = 2
+    # Only these peers may supply X-Forwarded-For. Leave empty without a trusted reverse proxy.
+    trusted_proxy_cidrs: list[str] = []
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -439,3 +439,11 @@ class SuggestionEvent(Base):
     unit_id: Mapped[int | None] = mapped_column(Integer, index=True)
     category_id: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+class RateLimitBucket(Base):
+    """Shared fixed-window counters for API workers."""
+    __tablename__ = "rate_limit_buckets"
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    count: Mapped[int] = mapped_column(Integer, nullable=False)
+    expires_at: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
