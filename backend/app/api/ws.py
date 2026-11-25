@@ -13,14 +13,21 @@ from .common import can_view
 router = APIRouter()
 
 
-def _auth(token: str | None):
+def _auth(token: str | None, mark_seen: bool = False, request_id: str | None = None):
     if not token:
         return None
     db = SessionLocal()
     try:
         user = user_from_token(db, token)
-        user.last_seen_at = utcnow()
-        db.commit()
+        if user.must_change_password:
+            return None
+        if request_id:
+            req = db.get(Request, request_id)
+            if req is None or not can_view(db, user, req):
+                return None
+        if mark_seen:
+            user.last_seen_at = utcnow()
+            db.commit()
         db.expunge(user)
         return user
     except HTTPException:
@@ -29,9 +36,22 @@ def _auth(token: str | None):
         db.close()
 
 
+async def _receive_authorized(ws: WebSocket) -> str:
+    while True:
+        try:
+            message = await asyncio.wait_for(ws.receive_text(), timeout=5)
+        except TimeoutError:
+            if not await hub.ensure_authorized(ws):
+                raise WebSocketDisconnect(code=4401)
+            continue
+        if not await hub.ensure_authorized(ws):
+            raise WebSocketDisconnect(code=4401)
+        return message
+
+
 @router.websocket("/ws/notifications")
 async def ws_notifications(ws: WebSocket, token: str | None = None):
-    user = _auth(token)
+    user = await asyncio.to_thread(_auth, token, True)
     if user is None:
         await ws.close(code=4401)
         return
@@ -40,10 +60,10 @@ async def ws_notifications(ws: WebSocket, token: str | None = None):
         channels.append("staff")
         if user.unit_id:
             channels.append(f"unit:{user.unit_id}")
-    await hub.connect(ws, user.id, channels)
+    await hub.connect(ws, user.id, channels, lambda: _auth(token) is not None)
     try:
         while True:
-            msg = await ws.receive_text()
+            msg = await _receive_authorized(ws)
             if msg == "ping":
                 await ws.send_text(json.dumps({"event": "pong"}))
     except WebSocketDisconnect:
@@ -54,7 +74,7 @@ async def ws_notifications(ws: WebSocket, token: str | None = None):
 
 @router.websocket("/ws/requests/{request_id}")
 async def ws_request(ws: WebSocket, request_id: str, token: str | None = None):
-    user = _auth(token)
+    user = await asyncio.to_thread(_auth, token, True)
     if user is None:
         await ws.close(code=4401)
         return
@@ -69,12 +89,14 @@ async def ws_request(ws: WebSocket, request_id: str, token: str | None = None):
         return
     staff = user.role in Role.STAFF
     channels = [f"request:{req.id}"] + ([f"request:{req.id}:staff"] if staff else [])
-    await hub.connect(ws, user.id, channels)
+    await hub.connect(ws, user.id, channels, lambda: _auth(token, request_id=req.id) is not None)
     try:
         while True:
             try:
-                data = json.loads(await ws.receive_text())
+                data = json.loads(await _receive_authorized(ws))
             except ValueError:
+                continue
+            if not isinstance(data, dict):
                 continue
             kind = data.get("type")
             if kind == "typing":

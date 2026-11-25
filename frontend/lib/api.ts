@@ -69,6 +69,7 @@ async function tryRefresh(): Promise<boolean> {
     .then(async (r) => {
       if (!r.ok) return false;
       const data = await r.json();
+      if (tokens.refresh !== rt) return false;
       tokens.set(data.access_token, data.refresh_token);
       return true;
     })
@@ -89,10 +90,12 @@ export async function api<T = unknown>(path: string, init: RequestInit & { json?
     body = JSON.stringify(init.json);
   }
   const res = await fetch(`${API_URL}/api/v1${path}`, { ...init, headers, body });
-  if (res.status === 401 && retry && (await tryRefresh())) return api<T>(path, init, false);
-  if (res.status === 401 && typeof window !== "undefined" && !path.startsWith("/auth/login")) {
-    tokens.clear();
-    window.dispatchEvent(new Event("qoldau:logout"));
+  if (res.status === 401 && path !== "/auth/login" && access === tokens.access) {
+    if (retry && (await tryRefresh())) return api<T>(path, init, false);
+    if (typeof window !== "undefined" && access === tokens.access) {
+      tokens.clear();
+      window.dispatchEvent(new Event("qoldau:logout"));
+    }
   }
   if (res.status === 204) return undefined as T;
   const text = await res.text();

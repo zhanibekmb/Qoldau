@@ -1,12 +1,15 @@
 """Admin configuration panel API (US14). Admin role only; every change is written to audit_log."""
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .. import schemas
-from ..db import Base, get_db
-from ..models import (AuditLog, Category, Request, Role, RoutingRule, SLAPolicy, Status, Unit, UrgencyKeyword, User)
-from ..security import hash_password, require_admin
+from ..db import Base, get_db, utcnow
+from ..models import (AuditLog, Category, EmailOutbox, PasswordResetToken, Request, Role, RoutingRule, SLAPolicy,
+                      Status, Unit, UrgencyKeyword, User)
+from ..security import hash_new_password, require_admin
+from ..services import sla
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
@@ -90,6 +93,17 @@ def _unit_guard(db: Session, unit: Unit) -> None:
         raise HTTPException(409, {"message": f"Unit has {n} open requests; reassign them before deleting"})
 
 
+def _validate_unit(db: Session, unit: Unit) -> None:
+    if not sla.parse_working_hours(unit.working_hours):
+        raise HTTPException(422, {"message": "Use working hours in the format Mon-Fri 09:00-18:00"})
+    if unit.head_user_id is not None:
+        head = db.get(User, unit.head_user_id)
+        if not head or not head.is_active or head.role != Role.UNIT_HEAD or head.unit_id != unit.id:
+            raise HTTPException(422, {"message": "Select an active unit head from this office"})
+    if unit.is_triage and db.query(Unit.id).filter(Unit.is_triage.is_(True), Unit.id != unit.id).first():
+        raise HTTPException(409, {"message": "One office can be marked as the Triage queue"})
+
+
 def _category_guard(db: Session, cat: Category) -> None:
     if db.query(Request).filter(Request.category_id == cat.id).count():
         raise HTTPException(409, {"message": "Category is used by requests; deactivate it instead"})
@@ -102,7 +116,7 @@ def _one_active_rule(db: Session, rule: RoutingRule) -> None:
 
 
 crud("category", Category, schemas.CategoryIn, schemas.CategoryOut, "categories", before_delete=_category_guard)
-crud("unit", Unit, schemas.UnitIn, schemas.UnitOut, "units", before_delete=_unit_guard)
+crud("unit", Unit, schemas.UnitIn, schemas.UnitOut, "units", before_delete=_unit_guard, after_write=_validate_unit)
 crud("sla_policy", SLAPolicy, schemas.SLAPolicyIn, schemas.SLAPolicyOut, "sla-policies")
 crud("urgency_keyword", UrgencyKeyword, schemas.KeywordIn, schemas.KeywordOut, "keywords")
 
@@ -183,11 +197,15 @@ def create_user(body: schemas.UserIn, db: Session = Depends(get_db), admin: User
         raise HTTPException(422, "Password is required for new users")
     data = body.model_dump(exclude={"password"})
     data["email"] = data["email"].lower()
-    user = User(**data, password_hash=hash_password(body.password))
+    user = User(**data, password_hash=hash_new_password(body.password), must_change_password=True)
     db.add(user)
-    _commit(db)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, {"message": "Duplicate or invalid reference"})
     audit(db, admin, "user", user.id, "create", None, snapshot(user))
-    db.commit()
+    _commit(db)
     return _user_out(user)
 
 
@@ -197,10 +215,32 @@ def update_user(obj_id: int, body: schemas.UserIn, db: Session = Depends(get_db)
     if user.id == admin.id and (body.role != Role.ADMIN or not body.is_active):
         raise HTTPException(409, {"message": "You cannot remove your own admin access"})
     old = snapshot(user)
-    for k, v in body.model_dump(exclude={"password"}).items():
-        setattr(user, k, v.lower() if k == "email" else v)
+    data = body.model_dump(exclude={"password"})
+    data["email"] = data["email"].lower()
+    access_fields = ("is_active", "role", "unit_id", "email")
+    if body.password or any(data[key] != old[key] for key in access_fields):
+        data.update(session_version=User.session_version + 1, last_seen_at=None)
     if body.password:
-        user.password_hash = hash_password(body.password)
+        data.update(password_hash=hash_new_password(body.password), must_change_password=True)
+    try:
+        changed = db.execute(update(User).where(User.id == obj_id, User.session_version == user.session_version)
+                             .values(**data))
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, {"message": "Duplicate or invalid reference"})
+    if changed.rowcount != 1:
+        raise HTTPException(409, "Account changed. Refresh and try again")
+    if body.password or any(data[key] != old[key] for key in access_fields):
+        now = utcnow()
+        db.query(PasswordResetToken).filter(PasswordResetToken.user_id == obj_id,
+                                            PasswordResetToken.used_at.is_(None)).update(
+            {PasswordResetToken.used_at: now}, synchronize_session=False)
+        db.query(EmailOutbox).filter(EmailOutbox.user_id == obj_id,
+                                     EmailOutbox.kind == "password_reset",
+                                     EmailOutbox.status == "queued").update(
+            {EmailOutbox.status: "failed", EmailOutbox.last_error: "superseded",
+             EmailOutbox.next_attempt_at: None}, synchronize_session=False)
+    db.refresh(user)
     audit(db, admin, "user", user.id, "update", old, {**snapshot(user), **({"password": "changed"} if body.password else {})})
     _commit(db)
     return _user_out(user)

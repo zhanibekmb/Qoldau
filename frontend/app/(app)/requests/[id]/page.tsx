@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CategoryChip, PriorityBadge, SlaBadge, StatusBadge } from "@/components/badges";
+import { StudentNextStep } from "@/components/StudentNextStep";
 import { Chat } from "@/components/Chat";
 import { CsatCard, Stars } from "@/components/Csat";
 import { ProgressTracker } from "@/components/ProgressTracker";
@@ -97,8 +98,9 @@ export default function RequestPage() {
               </span>
             )}
           </div>
+          {!staff && <p className="mt-2 text-sm font-medium">{req.unit?.name ?? t("nav.triage")}</p>}
         </div>
-        <dl className="grid shrink-0 grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+        {staff && <dl className="grid shrink-0 grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
           <dt className="text-muted">{t("detail.unit")}</dt>
           <dd>{req.unit?.name ?? "—"}</dd>
           <dt className="text-muted">{t("detail.assignee")}</dt>
@@ -111,8 +113,10 @@ export default function RequestPage() {
               <dd>{req.student.name}</dd>
             </>
           )}
-        </dl>
+        </dl>}
       </div>
+
+      {!staff && <StudentNextStep request={req} />}
 
       <Card>
         <h2 className="sr-only">{t("detail.progress")}</h2>

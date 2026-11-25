@@ -12,6 +12,8 @@ jobs:
       QOLDAU_DATABASE_URL: sqlite:////tmp/qoldau-e2e.db
       QOLDAU_SCHEDULER_ENABLED: "false"
       QOLDAU_JOBS_INLINE: "true"
+      QOLDAU_PILOT_DIRECTORY_PUBLISHED: "true"
+      QOLDAU_ATTACHMENT_MODE: "disabled"
       QOLDAU_UPLOAD_DIR: /tmp/qoldau-e2e-uploads
       QOLDAU_EXPORT_DIR: /tmp/qoldau-e2e-exports
       NEXT_PUBLIC_API_URL: http://127.0.0.1:8000

@@ -15,7 +15,7 @@ from .db import SessionLocal
 from .ml import embeddings, training
 from .ml.classifier import load_or_train
 from .rate_limit import RateLimitExceeded, enforce_limit, identity, policy_for
-from .services import jobs, sla
+from .services import email_delivery, jobs, sla
 from .services.realtime import hub
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -48,6 +48,9 @@ async def lifespan(app: FastAPI):
         scheduler = BackgroundScheduler(timezone="UTC")
         scheduler.add_job(sla_job, "interval", seconds=settings.sla_job_seconds, id="sla", max_instances=1,
                           coalesce=True)
+        if settings.smtp_host:
+            scheduler.add_job(email_delivery.deliver_job, "interval", seconds=settings.email_job_seconds,
+                              id="email_delivery", max_instances=1, coalesce=True)
         # Other workers activate / roll back models by polling the registry (no downtime, < 1 min).
         scheduler.add_job(training.sync_active_model_job, "interval", seconds=settings.model_sync_seconds,
                           id="model_sync", max_instances=1, coalesce=True)

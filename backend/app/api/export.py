@@ -21,7 +21,7 @@ MEDIA = {"excel": "application/vnd.openxmlformats-officedocument.spreadsheetml.s
 def job_out(job: ReportJob, viewer: User) -> schemas.ReportJobOut:
     out = schemas.ReportJobOut.model_validate(job)
     if job.status == "done" and job.file_key:
-        exp, sig = sign_export(job.id, viewer.id)
+        exp, sig = sign_export(job.id, viewer)
         out.download_url = f"/api/v1/export/files/{job.id}?uid={viewer.id}&exp={exp}&sig={sig}"
     return out
 
@@ -78,11 +78,11 @@ def get_job(job_id: int, db: Session = Depends(get_db), user: User = Depends(req
 
 @router.get("/files/{job_id}", summary="Download via signed link (valid 24 h)")
 def download(job_id: int, uid: int, exp: int, sig: str, db: Session = Depends(get_db)):
-    if not verify_export_signature(job_id, uid, exp, sig):
+    viewer = db.get(User, uid)
+    if not viewer or not verify_export_signature(job_id, viewer, exp, sig):
         raise HTTPException(403, "Link expired or invalid")
     job = db.get(ReportJob, job_id)
-    viewer = db.get(User, uid)
-    if job is None or viewer is None or not viewer.is_active or job.status != "done":
+    if job is None or not viewer.is_active or viewer.must_change_password or job.status != "done":
         raise HTTPException(404, "Not found")
     if viewer.role not in (Role.UNIT_HEAD, Role.ADMIN):
         raise HTTPException(404, "Not found")
@@ -92,4 +92,5 @@ def download(job_id: int, uid: int, exp: int, sig: str, db: Session = Depends(ge
     if not path.exists():
         raise HTTPException(404, "File missing")
     ext = "xlsx" if job.type == "excel" else "pdf"
-    return FileResponse(path, media_type=MEDIA[job.type], filename=f"qoldau-report-{job.id}.{ext}")
+    return FileResponse(path, media_type=MEDIA[job.type], filename=f"qoldau-report-{job.id}.{ext}",
+                        headers={"Cache-Control": "private, no-store"})

@@ -70,6 +70,8 @@ def policy_for(request: Request, settings: Settings) -> Policy | None:
         return Policy("login-ip", settings.rate_limit_login_ip_per_minute, 60, by_ip=True)
     if method == "POST" and path == "/api/v1/auth/refresh":
         return Policy("refresh", settings.rate_limit_refresh_per_minute, 60, by_ip=True)
+    if method == "POST" and path == "/api/v1/auth/change-password":
+        return Policy("password-change", settings.rate_limit_login_account_per_minute, 60)
     if method == "POST" and path == "/api/v1/requests":
         return Policy("request-create", settings.rate_limit_write_per_hour, 3600)
     if method == "POST" and re.fullmatch(r"/api/v1/requests/[^/]+/messages", path):

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, fileUrl, sanitize } from "@/lib/api";
 import { fileSize, fmtDate } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
+import { usePublicService } from "@/lib/public-service";
 import { type RtEvent, useRequestSocket } from "@/lib/realtime";
 import type { Message, User } from "@/lib/types";
 import { Button, FieldError } from "./ui";
@@ -15,6 +16,7 @@ interface Pending {
   body: string;
   internal: boolean;
   files: File[];
+  uploaded: number[];
   state: "sending" | "failed";
 }
 
@@ -36,6 +38,7 @@ export function Chat({
   onSent?: (body: string, internal: boolean) => void;
 }) {
   const { t, lang } = useI18n();
+  const service = usePublicService();
   const staff = viewer.role !== "student";
   const [messages, setMessages] = useState<Message[]>([]);
   const [pending, setPending] = useState<Pending[]>([]);
@@ -91,10 +94,10 @@ export function Chat({
   }, [messages.length, pending.length]);
 
   async function deliver(p: Pending) {
+    const ids = [...p.uploaded];
     setPending((ps) => ps.map((x) => (x.key === p.key ? { ...x, state: "sending" } : x)));
     try {
-      const ids: number[] = [];
-      for (const f of p.files) {
+      for (const f of p.files.slice(ids.length)) {
         const fd = new FormData();
         fd.append("file", f);
         const a = await api<{ id: number }>(`/requests/${requestId}/attachments`, { method: "POST", body: fd });
@@ -107,8 +110,8 @@ export function Chat({
       setPending((ps) => ps.filter((x) => x.key !== p.key));
       load();
     } catch (err) {
-      if (err instanceof ApiError && err.status < 500 && err.status !== 0) setError(err.message);
-      setPending((ps) => ps.map((x) => (x.key === p.key ? { ...x, state: "failed" } : x)));
+      setError(err instanceof ApiError && err.status < 500 ? err.message : t("common.error"));
+      setPending((ps) => ps.map((x) => (x.key === p.key ? { ...x, uploaded: ids, state: "failed" } : x)));
     }
   }
 
@@ -116,7 +119,7 @@ export function Chat({
     e.preventDefault();
     setError("");
     if (!text.trim() && !files.length) return;
-    const p: Pending = { key: crypto.randomUUID(), body: text.trim(), internal: staff && internal, files, state: "sending" };
+    const p: Pending = { key: crypto.randomUUID(), body: text.trim(), internal: staff && internal, files, uploaded: [], state: "sending" };
     setPending((ps) => [...ps, p]);
     onSent?.(p.body, p.internal);
     setText("");
@@ -221,14 +224,17 @@ export function Chat({
             </div>
           )}
           <div className="flex items-end gap-2">
+            {service?.attachments_enabled && <>
             <input
               ref={fileRef}
               type="file"
               multiple
               accept=".pdf,.jpg,.jpeg,.png,.docx"
-              className="sr-only"
+              hidden
               onChange={(e) => {
-                const list = Array.from(e.target.files ?? []).filter((f) => f.size <= 10 * 1024 * 1024);
+                const selected = Array.from(e.target.files ?? []);
+                const list = selected.filter((f) => f.size <= service.max_upload_mb * 1024 * 1024);
+                setError(list.length === selected.length ? "" : t("pilot.fileRules", { n: service.max_upload_mb }));
                 setFiles((x) => [...x, ...list].slice(0, 5));
                 e.target.value = "";
               }}
@@ -236,6 +242,7 @@ export function Chat({
             <Button type="button" variant="secondary" aria-label={t("chat.attach")} onClick={() => fileRef.current?.click()}>
               <Paperclip className="h-5 w-5" />
             </Button>
+            </>}
             <textarea
               ref={inputRef}
               value={text}
@@ -251,7 +258,7 @@ export function Chat({
               aria-label={t("chat.placeholder")}
               placeholder={internal ? t("chat.internalPlaceholder") : t("chat.placeholder")}
               className={clsx(
-                "min-h-11 flex-1 resize-none rounded-md border bg-surface px-3 py-2.5 text-[15px] focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25",
+                "min-h-11 min-w-0 flex-1 resize-none rounded-md border bg-surface px-3 py-2.5 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25",
                 internal ? "border-yellow-500" : "border-border",
               )}
             />

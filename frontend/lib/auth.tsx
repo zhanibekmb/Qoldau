@@ -8,8 +8,11 @@ interface AuthCtx {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<User>;
+  changePassword: (current: string, next: string) => Promise<User>;
   logout: () => Promise<void>;
 }
+
+interface TokenPair { access_token: string; refresh_token: string }
 
 const Ctx = createContext<AuthCtx | null>(null);
 
@@ -40,16 +43,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("qoldau:logout", onLogout);
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const t = await api<{ access_token: string; refresh_token: string }>("/auth/login", {
-      method: "POST",
-      json: { email, password },
-    });
-    tokens.set(t.access_token, t.refresh_token);
+  const startSession = useCallback(async (pair: TokenPair) => {
+    tokens.set(pair.access_token, pair.refresh_token);
     const me = await api<User>("/auth/me");
     setUser(me);
     return me;
   }, []);
+
+  const login = useCallback(async (email: string, password: string) => startSession(
+    await api<TokenPair>("/auth/login", { method: "POST", json: { email, password } })
+  ), [startSession]);
+
+  const changePassword = useCallback(async (current: string, next: string) => startSession(
+    await api<TokenPair>("/auth/change-password", {
+      method: "POST", json: { current_password: current, new_password: next },
+    })
+  ), [startSession]);
 
   const logout = useCallback(async () => {
     try {
@@ -59,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
-  return <Ctx.Provider value={{ user, loading, login, logout }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ user, loading, login, changePassword, logout }}>{children}</Ctx.Provider>;
 }
 
 export function useAuth() {

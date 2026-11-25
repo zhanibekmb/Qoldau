@@ -9,9 +9,11 @@ import { useI18n } from "@/lib/i18n";
 import { useRealtimeEvent } from "@/lib/realtime";
 import type { CategoryMeta, Page, RequestCard } from "@/lib/types";
 import { CategoryChip, PriorityBadge, SlaBadge, StatusBadge } from "./badges";
-import { Button, Empty, Input, Select, Spinner } from "./ui";
+import { FilterDate, FilterDialog, FilterSelect } from "./FilterDialog";
+import { Button, Empty, Input, Spinner } from "./ui";
 
 const STATUSES = ["Submitted", "Needs Review", "Routed", "In Progress", "Waiting for Student", "Resolved", "Closed", "Reopened"];
+const DEFAULT_FILTERS = { status: "", category: "", priority: "", from: "", to: "" };
 
 /** Searchable, filterable, paginated request list (US11): 20 per page. */
 export function RequestList({
@@ -30,11 +32,8 @@ export function RequestList({
   const [categories, setCategories] = useState<CategoryMeta[]>([]);
   const [q, setQ] = useState("");
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("");
-  const [category, setCategory] = useState("");
-  const [priority, setPriority] = useState("");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const { status, category, priority, from, to } = filters;
   const [page, setPage] = useState(1);
   const [data, setData] = useState<Page<RequestCard> | null>(null);
 
@@ -72,73 +71,54 @@ export function RequestList({
     if (["status_changed", "request_updated", "request_new", "triage_new"].includes(e.event)) load();
   });
 
-  const filtered = !!(query || status || category || priority || from || to);
+  const applyFilters = (next: typeof DEFAULT_FILTERS) => {
+    setFilters(next);
+    setPage(1);
+  };
+  const filtered = Boolean(q || status || category || priority || from || to);
   const clear = () => {
     setQ("");
     setQuery("");
-    setStatus("");
-    setCategory("");
-    setPriority("");
-    setFrom("");
-    setTo("");
-    setPage(1);
-  };
-  const set = (fn: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    fn(e.target.value);
-    setPage(1);
+    applyFilters(DEFAULT_FILTERS);
   };
 
   return (
     <div className="space-y-4">
-      <div className="space-y-3">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden />
-          <Input aria-label={t("common.search")} placeholder={t("list.searchPlaceholder")} value={q} onChange={(e) => setQ(e.target.value)} className="pl-9" />
+      <div className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1 sm:max-w-md">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
+          <Input type="search" aria-label={t("common.search")} placeholder={t("list.searchPlaceholder")} value={q} onChange={(e) => setQ(e.target.value)} className="min-w-0 pl-9" />
         </div>
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
-          {view !== "triage" && (
-            <Select aria-label={t("list.status")} value={status} onChange={set(setStatus)}>
-              <option value="">
-                {t("list.status")}: {t("common.all")}
-              </option>
-              {STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {t(`status.${s}`)}
-                </option>
-              ))}
-            </Select>
+        <FilterDialog value={filters} defaults={DEFAULT_FILTERS} onApply={applyFilters}>
+          {(draft, update) => (
+            <>
+              {view !== "triage" && (
+                <FilterSelect label={t("list.status")} value={draft.status} onChange={(e) => update({ status: e.target.value })}>
+                  <option value="">{t("common.all")}</option>
+                  {STATUSES.map((s) => <option key={s} value={s}>{t(`status.${s}`)}</option>)}
+                </FilterSelect>
+              )}
+              <FilterSelect label={t("list.priority")} wide={view === "triage"} value={draft.priority} onChange={(e) => update({ priority: e.target.value })}>
+                <option value="">{t("common.all")}</option>
+                {["Critical", "High", "Medium", "Low"].map((p) => <option key={p} value={p}>{t(`prio.${p}`)}</option>)}
+              </FilterSelect>
+              <FilterSelect label={t("list.category")} wide value={draft.category} onChange={(e) => update({ category: e.target.value })}>
+                <option value="">{t("common.all")}</option>
+                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </FilterSelect>
+              <FilterDate label={t("list.from")} value={draft.from} max={draft.to || undefined} onChange={(e) => update({ from: e.target.value })} />
+              <FilterDate label={t("list.to")} value={draft.to} min={draft.from || undefined} onChange={(e) => update({ to: e.target.value })} />
+            </>
           )}
-          <Select aria-label={t("list.category")} value={category} onChange={set(setCategory)}>
-            <option value="">
-              {t("list.category")}: {t("common.all")}
-            </option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </Select>
-          <Select aria-label={t("list.priority")} value={priority} onChange={set(setPriority)}>
-            <option value="">
-              {t("list.priority")}: {t("common.all")}
-            </option>
-            {["Critical", "High", "Medium", "Low"].map((p) => (
-              <option key={p} value={p}>
-                {t(`prio.${p}`)}
-              </option>
-            ))}
-          </Select>
-          <Input type="date" aria-label={t("list.from")} value={from} onChange={set(setFrom)} />
-          <Input type="date" aria-label={t("list.to")} value={to} onChange={set(setTo)} />
-        </div>
-        <div className="flex items-center justify-between text-sm text-muted">
-          <span aria-live="polite">{data ? t("list.results", { n: data.total }) : ""}</span>
-          {filtered && (
-            <Button size="sm" variant="ghost" onClick={clear}>
-              {t("common.clear")}
-            </Button>
-          )}
-        </div>
+        </FilterDialog>
+      </div>
+      <div className="flex items-center justify-between text-sm text-muted">
+        <span aria-live="polite">{data ? t("list.results", { n: data.total }) : ""}</span>
+        {filtered && (
+          <button type="button" onClick={clear} className="rounded px-1.5 py-1 font-medium text-primary hover:bg-surface-2">
+            {t("common.clear")}
+          </button>
+        )}
       </div>
 
       {!data ? (

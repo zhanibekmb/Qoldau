@@ -2,6 +2,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -10,7 +11,7 @@ from ..config import get_settings
 from ..db import get_db, utcnow
 from ..models import CSAT, Attachment, Escalation, Message, Notification, Request, Role, Status, Unit, User
 from ..security import current_user, require_roles, sign_file, verify_file_signature
-from ..services import notifications, suggestions, workflow
+from ..services import file_scan, notifications, suggestions, workflow
 from .common import can_view, get_request_or_404
 
 router = APIRouter(tags=["messaging"])
@@ -22,16 +23,13 @@ ALLOWED_TYPES = {
     "png": ("image/png", [b"\x89PNG\r\n\x1a\n"]),
     "docx": ("application/vnd.openxmlformats-officedocument.wordprocessingml.document", [b"PK\x03\x04"]),
 }
-EICAR = b"EICAR-STANDARD-ANTIVIRUS-TEST-FILE"
-
-
-def scan_for_malware(data: bytes) -> bool:
-    """Minimal built-in scanner (EICAR test signature + PE executables). Swap for ClamAV in production."""
-    return EICAR in data or data[:2] == b"MZ"
+def _attachment_available(attachment: Attachment) -> bool:
+    mode = get_settings().effective_attachment_mode
+    return mode == "development" or (mode == "clamav" and attachment.scan_engine == "clamav")
 
 
 def attachment_out(a: Attachment, viewer: User) -> schemas.AttachmentOut:
-    exp, sig = sign_file(a.id, viewer.id)
+    exp, sig = sign_file(a.id, viewer)
     return schemas.AttachmentOut(id=a.id, filename=a.filename, content_type=a.content_type, size=a.size,
                                  url=f"/api/v1/files/{a.id}?uid={viewer.id}&exp={exp}&sig={sig}")
 
@@ -39,7 +37,8 @@ def attachment_out(a: Attachment, viewer: User) -> schemas.AttachmentOut:
 def message_out(m: Message, viewer: User) -> schemas.MessageOut:
     return schemas.MessageOut(id=m.id, request_id=m.request_id, author=schemas.UserBrief.model_validate(m.author),
                               author_role=m.author.role, body=m.body, is_internal=m.is_internal, read_at=m.read_at,
-                              created_at=m.created_at, attachments=[attachment_out(a, viewer) for a in m.attachments])
+                              created_at=m.created_at,
+                              attachments=[attachment_out(a, viewer) for a in m.attachments if _attachment_available(a)])
 
 
 def post_message(db: Session, req: Request, author: User, body: str, is_internal: bool = False,
@@ -117,7 +116,7 @@ def create_message(request_id: str, body: schemas.MessageIn, db: Session = Depen
     if body.attachment_ids:
         atts = db.query(Attachment).filter(Attachment.id.in_(body.attachment_ids), Attachment.request_id == req.id,
                                            Attachment.uploader_id == user.id, Attachment.message_id.is_(None)).all()
-        if len(atts) != len(set(body.attachment_ids)):
+        if len(atts) != len(set(body.attachment_ids)) or not all(map(_attachment_available, atts)):
             raise HTTPException(422, "Invalid attachment ids")
     if not body.body and not atts:
         raise HTTPException(422, "Message is empty")
@@ -131,6 +130,11 @@ async def upload_attachment(request_id: str, file: UploadFile = File(...), db: S
                             user: User = Depends(current_user)):
     req = get_request_or_404(db, request_id, user)
     s = get_settings()
+    mode = s.effective_attachment_mode
+    if mode == "disabled":
+        raise HTTPException(403, "Attachments are disabled")
+    if req.status == Status.CLOSED:
+        raise HTTPException(409, {"message": "Request is closed"})
     name = (file.filename or "file").replace("\\", "/").rsplit("/", 1)[-1][:180]
     ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
     if ext not in ALLOWED_TYPES:
@@ -142,26 +146,35 @@ async def upload_attachment(request_id: str, file: UploadFile = File(...), db: S
     content_type, magics = ALLOWED_TYPES[ext]
     if not any(data.startswith(mg) for mg in magics):
         raise HTTPException(415, "File content does not match its extension")
-    if scan_for_malware(data):
+    try:
+        rejected = await run_in_threadpool(file_scan.infected, data, s)
+    except file_scan.ScannerUnavailable:
+        raise HTTPException(503, "Attachment scanning is temporarily unavailable") from None
+    if rejected:
         raise HTTPException(422, "File rejected by virus scan")
     key = f"{req.id}/{uuid.uuid4().hex}.{ext}"
     path = s.upload_dir / key
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(data)
     att = Attachment(request_id=req.id, uploader_id=user.id, filename=name, content_type=content_type,
-                     size=len(data), storage_key=key)
+                     size=len(data), storage_key=key, scan_engine=mode)
     db.add(att)
-    db.commit()
+    try:
+        path.write_bytes(data)
+        db.commit()
+    except Exception:
+        db.rollback()
+        path.unlink(missing_ok=True)
+        raise
     return attachment_out(att, user)
 
 
 @router.get("/files/{attachment_id}", include_in_schema=True, summary="Download via signed URL")
 def download(attachment_id: int, uid: int, exp: int, sig: str, db: Session = Depends(get_db)):
-    if not verify_file_signature(attachment_id, uid, exp, sig):
+    viewer = db.get(User, uid)
+    if not viewer or not verify_file_signature(attachment_id, viewer, exp, sig):
         raise HTTPException(403, "Link expired or invalid")
     att = db.get(Attachment, attachment_id)
-    viewer = db.get(User, uid)
-    if att is None or viewer is None or not viewer.is_active:
+    if att is None or not _attachment_available(att) or not viewer.is_active or viewer.must_change_password:
         raise HTTPException(404, "Not found")
     req = db.get(Request, att.request_id)
     if req is None or not can_view(db, viewer, req):
@@ -171,7 +184,8 @@ def download(attachment_id: int, uid: int, exp: int, sig: str, db: Session = Dep
     path = get_settings().upload_dir / att.storage_key
     if not path.exists():
         raise HTTPException(404, "File missing")
-    return FileResponse(path, media_type=att.content_type, filename=att.filename)
+    return FileResponse(path, media_type=att.content_type, filename=att.filename,
+                        headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
 
 
 @router.post("/requests/{request_id}/csat", response_model=schemas.CSATOut, status_code=201)

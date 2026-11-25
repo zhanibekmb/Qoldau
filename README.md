@@ -46,15 +46,7 @@ npm install
 npm run dev
 ```
 
-Demo accounts (password `Qoldau123!`):
-
-| Role | Email |
-|---|---|
-| Student (owns REQ-2026-00123) | `student@qoldau.edu.kz` |
-| Agent — IT Help Desk | `agent1.it@qoldau.edu.kz` (any unit: `agent{1-3}.<unit>@qoldau.edu.kz`) |
-| Agent — Triage queue | `agent1.triage@qoldau.edu.kz` |
-| Unit head — Library | `head.library@qoldau.edu.kz` (`head.<unit>@…`) |
-| Admin | `admin@qoldau.edu.kz` |
+Development-only demo accounts and local pilot account procedures are documented in [Local authentication and pilot access](docs/LOCAL_AUTH_TESTING.md). The demo directory is hidden unless `QOLDAU_ENVIRONMENT=development` and `QOLDAU_DEMO_LOGIN_ENABLED=true`; production rejects this setting.
 
 Unit slugs: `deans, registrar, finance, it, housing, library, medical, international, triage`.
 

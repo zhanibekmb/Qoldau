@@ -1,21 +1,23 @@
-"""In-app + email notifications (US8).
-
-Realtime pushes and emails are queued on the DB session and only dispatched after the
-transaction commits, so clients never receive events for data that was rolled back.
-"""
-import logging
-import smtplib
-import threading
-from email.message import EmailMessage
+"""Persist in-app notifications and email outbox entries in the same transaction."""
 
 from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 from ..config import get_settings
+from ..db import utcnow
 from ..models import EmailOutbox, Notification, Request, User
 from .realtime import hub
 
-log = logging.getLogger(__name__)
+EMAIL_COPY = {
+    "en": ("Qoldau update", "You have an update in Qoldau. Sign in to the portal to view it."),
+    "ru": ("Обновление в Qoldau", "В Qoldau есть обновление. Войдите в портал, чтобы его посмотреть."),
+    "kz": ("Qoldau порталындағы жаңарту", "Qoldau порталында жаңарту бар. Оны көру үшін порталға кіріңіз."),
+}
+PASSWORD_RESET_COPY = {
+    "en": ("Reset your Qoldau password", "Use this one-time link to choose a new password. It expires in 15 minutes.\n\n{{RESET_URL}}\n\nIf you did not request this, ignore this email."),
+    "ru": ("Сброс пароля Qoldau", "Перейдите по одноразовой ссылке, чтобы задать новый пароль. Ссылка действует 15 минут.\n\n{{RESET_URL}}\n\nЕсли вы не запрашивали сброс, просто проигнорируйте это письмо."),
+    "kz": ("Qoldau құпиясөзін қалпына келтіру", "Жаңа құпиясөз орнату үшін бір реттік сілтемені ашыңыз. Сілтеме 15 минут жарамды.\n\n{{RESET_URL}}\n\nЕгер сұрауды сіз жасамаған болсаңыз, бұл хатты елемеңіз."),
+}
 
 
 def queue_push(db: Session, channel: str, payload: dict) -> None:
@@ -24,43 +26,31 @@ def queue_push(db: Session, channel: str, payload: dict) -> None:
 
 @event.listens_for(Session, "after_commit")
 def _flush_pushes(session: Session) -> None:
-    pushes = session.info.pop("pushes", [])
-    emails = session.info.pop("emails", [])
-    for channel, payload in pushes:
+    for channel, payload in session.info.pop("pushes", []):
         hub.publish(channel, payload)
-    if emails:
-        threading.Thread(target=_send_emails, args=(emails,), daemon=True).start()
 
 
 @event.listens_for(Session, "after_rollback")
 def _drop_pushes(session: Session) -> None:
     session.info.pop("pushes", None)
-    session.info.pop("emails", None)
 
 
-def _send_emails(emails: list[tuple[str, str, str]]) -> None:
+def queue_email(db: Session, user: User, *, subject: str | None = None, body: str | None = None,
+                include_portal_url: bool = True, kind: str = "notification") -> None:
     s = get_settings()
-    if not s.smtp_host:
-        for to, subject, _ in emails:
-            log.info("email (logged only) to=%s subject=%s", to, subject)
-        return
-    try:
-        with smtplib.SMTP(s.smtp_host, s.smtp_port, timeout=10) as smtp:
-            smtp.starttls()
-            if s.smtp_user:
-                smtp.login(s.smtp_user, s.smtp_password)
-            for to, subject, body in emails:
-                msg = EmailMessage()
-                msg["From"], msg["To"], msg["Subject"] = s.smtp_from, to, subject
-                msg.set_content(body)
-                smtp.send_message(msg)
-    except Exception:
-        log.exception("SMTP delivery failed")
+    default_subject, default_body = EMAIL_COPY.get(user.language, EMAIL_COPY["en"])
+    subject = subject or default_subject
+    body = body or default_body
+    if include_portal_url and s.email_portal_url:
+        body += f"\n\n{s.email_portal_url}\n"
+    db.add(EmailOutbox(user_id=user.id, kind=kind, to=user.email, subject=subject, body=body,
+                       status="queued" if s.smtp_host else "logged",
+                       next_attempt_at=utcnow() if s.smtp_host else None))
 
 
-def send_email(db: Session, to: str, subject: str, body: str) -> None:
-    db.add(EmailOutbox(to=to, subject=subject, body=body, status="queued" if get_settings().smtp_host else "logged"))
-    db.info.setdefault("emails", []).append((to, subject, body))
+def queue_password_reset_email(db: Session, user: User) -> None:
+    subject, body = PASSWORD_RESET_COPY.get(user.language, PASSWORD_RESET_COPY["en"])
+    queue_email(db, user, subject=subject, body=body, include_portal_url=False, kind="password_reset")
 
 
 def notify(db: Session, user: User, type_: str, title: str, body: str = "", request: Request | None = None,
@@ -74,10 +64,6 @@ def notify(db: Session, user: User, type_: str, title: str, body: str = "", requ
                          "request_id": n.request_id, "is_read": False,
                          "created_at": n.created_at.isoformat() + "Z"},
     })
-    if email and user.email:
-        ref = f"[{request.id}] " if request else ""
-        lines = [body]
-        if request:
-            lines += ["", f"Request: {request.id}", f"Subject: {request.subject}", f"Status: {request.status}"]
-        send_email(db, user.email, f"{ref}{title}", "\n".join(lines))
+    if email and user.is_active and user.email:
+        queue_email(db, user)
     return n

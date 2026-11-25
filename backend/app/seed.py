@@ -369,6 +369,8 @@ def seed_demo_models(db: Session, rng: random.Random) -> None:
 
 
 def run(reset: bool = False, n: int = 520, demo: bool = False) -> None:
+    if get_settings().environment != "development":
+        raise SystemExit("Sample data can only be created in development. Use app.bootstrap for pilot reference data.")
     if reset:
         reset_db()
     create_schema()
