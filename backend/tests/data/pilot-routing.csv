@@ -1,0 +1,31 @@
+id,language,subject,description,expected,critical
+EN01,en,Authenticator reset for Moodle,"My replacement phone cannot approve the MFA challenge for Moodle. I still have the old backup code and need to restore access.",IT Help Desk,false
+EN02,en,Radiator in the dormitory,"The radiator in my dormitory stays cold even with the valve open. Can the housing maintenance team check the room?",Student Housing Office,false
+EN03,en,Duplicate tuition payment,"My bank statement shows two tuition payments for the same invoice. Could Finance check the duplicate and explain the refund process?",Finance Office,false
+EN04,en,Official academic transcript,"I need a signed transcript that lists completed credits and grades. Where can I request an official copy?",Registrar Office,false
+EN05,en,Library book renewal,"The library catalogue shows that my borrowed book is due back on Friday. Can I renew the loan without visiting the desk?",Main Library Desk,false
+EN06,en,Exchange semester visa paperwork,"I am planning an exchange semester abroad and need help with the visa letter and mobility documents.",International Office,false
+EN07,en,Appeal a course grade,"My final grade excludes a marked assignment. How can I file a grade appeal with the dean’s office?",Dean's Office,false
+EN08,en,Add a class after enrolment,"I dropped a course during registration and want to enrol in a different course section. Where do I update my schedule?",Registrar Office,false
+EN09,en,Injury on campus,"I hurt my ankle and cannot put weight on it. I need help from the campus medical centre for the injury.",Medical & Counselling Center,true
+EN10,en,Question for somebody,"Hello. I am not sure where to start. Could somebody take a look?",Triage,false
+RU01,ru,Слетела авторизация в Moodle,"После замены телефона не приходит подтверждение входа в Moodle. Где сбросить двухфакторную авторизацию?",IT Help Desk,false
+RU02,ru,Кран в общежитии,"В кухне нашего общежития течёт кран под раковиной. Как оставить заявку на ремонт комнаты или общего помещения?",Student Housing Office,false
+RU03,ru,Платёж за обучение не отобразился,"В приложении банка оплата обучения прошла. В квитанции университета сумма всё ещё числится как задолженность.",Finance Office,false
+RU04,ru,Справка с места учёбы,"Для оформления льготного проездного нужна справка с места учёбы с подписью. Как заказать документ?",Registrar Office,false
+RU05,ru,Продление книг в библиотеке,"Взяла два учебника в библиотеке. Как продлить срок выдачи книг через каталог?",Main Library Desk,false
+RU06,ru,Документы на обмен,"Отбор на семестр по обмену пройден. Нужна консультация по визе и документам академической мобильности.",International Office,false
+RU07,ru,Апелляция по итоговой оценке,"В ведомости итоговая оценка ниже из-за неучтённой работы. Как подать апелляцию в деканат?",Dean's Office,false
+RU08,ru,Не получается зарегистрироваться на курс,"Нужна запись на другую группу курса. В период регистрации расписание пересекается и не даёт выбрать предмет.",Registrar Office,false
+RU09,ru,Травма на занятии,"Упала на тренировке и получила травму руки. Прошу направить меня в медицинский пункт университета.",Medical & Counselling Center,true
+RU10,ru,К кому обратиться?,"Добрый день. Хочу уточнить один момент. Не знаю с кем лучше поговорить.",Triage,false
+KZ01,kz,Moodle-ға кіре алмаймын,"Телефонымды ауыстырғаннан кейін Moodle жүйесінде растау коды шықпайды. Университет аккаунтына кіруді қалпына келтіру керек.",IT Help Desk,false
+KZ02,kz,Жатақханадағы есік,"Жатақхана бөлмесінің есігі жабылмайды. Тұрғын үй бөлімінен жөндеу маманын қалай шақырамын?",Student Housing Office,false
+KZ03,kz,Оқу ақысын екі рет төледім,"Банк қосымшасында бір оқу ақысы үшін екі төлем көрініп тұр. Артық төленген ақшаны қайтару тәртібі қандай?",Finance Office,false
+KZ04,kz,Оқу орнынан анықтама,"Жолақы жеңілдігі үшін студент екенім туралы қол қойылған анықтама керек. Құжатты қалай алуға болады?",Registrar Office,false
+KZ05,kz,Кітапхана кітабын ұзарту,"Кітапханадан оқулық алдым. Кітапты қайтару мерзімін электронды каталог арқылы ұзартуға бола ма?",Main Library Desk,false
+KZ06,kz,Алмасу бағдарламасына құжат,"Келесі семестрде шетелге академиялық ұтқырлықпен барамын. Виза мен шақыру құжатын рәсімдеуге көмек керек.",International Office,false
+KZ07,kz,Қорытынды бағаға апелляция,"Тексерілген тапсырманың ұпайы қорытынды бағаға қосылмапты. Деканатқа апелляцияны қалай жіберемін?",Dean's Office,false
+KZ08,kz,Пәнге тіркелу,"Кестем сәйкес келмегендіктен пәннің басқа тобына тіркелгім келеді. Курсқа қайта тіркелуді қайдан бастаймын?",Registrar Office,false
+KZ09,kz,Денсаулығыма қауіп төнді,"Тыныс алуым қиындап тұр. Денсаулығыма қауіп бар деп ойлаймын. Медициналық пункттің көмегі қажет.",Medical & Counselling Center,true
+KZ10,kz,Бір сұрағым бар еді,"Сәлеметсіз бе. Кімге жазатынымды білмедім. Осы мәселені қарап бере аласыз ба?",Triage,false

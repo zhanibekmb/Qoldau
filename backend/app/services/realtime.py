@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 from collections import defaultdict
+from collections.abc import Callable
 
 from fastapi import WebSocket
 
@@ -18,18 +19,21 @@ class Hub:
     def __init__(self) -> None:
         self.channels: dict[str, set[WebSocket]] = defaultdict(set)
         self.online_users: dict[int, int] = defaultdict(int)  # user_id -> open sockets
+        self.checks: dict[WebSocket, Callable[[], bool]] = {}
         self.loop: asyncio.AbstractEventLoop | None = None
 
     def bind_loop(self, loop: asyncio.AbstractEventLoop) -> None:
         self.loop = loop
 
-    async def connect(self, ws: WebSocket, user_id: int, channels: list[str]) -> None:
+    async def connect(self, ws: WebSocket, user_id: int, channels: list[str], check: Callable[[], bool]) -> None:
         await ws.accept()
+        self.checks[ws] = check
         for ch in channels:
             self.channels[ch].add(ws)
         self.online_users[user_id] += 1
 
     def disconnect(self, ws: WebSocket, user_id: int, channels: list[str]) -> None:
+        self.checks.pop(ws, None)
         for ch in channels:
             self.channels[ch].discard(ws)
         self.online_users[user_id] = max(0, self.online_users[user_id] - 1)
@@ -37,13 +41,25 @@ class Hub:
     def is_online(self, user_id: int) -> bool:
         return self.online_users.get(user_id, 0) > 0
 
+    async def ensure_authorized(self, ws: WebSocket) -> bool:
+        check = self.checks.get(ws)
+        if check and await asyncio.to_thread(check):
+            return ws in self.checks
+        if self.checks.pop(ws, None):
+            try:
+                await ws.close(code=4401)
+            except (OSError, RuntimeError):
+                pass
+        return False
+
     async def _send(self, channel: str, payload: dict, exclude: WebSocket | None = None) -> None:
         data = json.dumps(payload, default=str)
         for ws in list(self.channels.get(channel, ())):
             if ws is exclude:
                 continue
             try:
-                await ws.send_text(data)
+                if await self.ensure_authorized(ws):
+                    await ws.send_text(data)
             except Exception:  # client went away
                 self.channels[channel].discard(ws)
 

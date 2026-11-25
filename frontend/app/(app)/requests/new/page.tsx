@@ -5,17 +5,19 @@ import { CheckCircle2, FileText, Paperclip, Sparkles, Trash2, UploadCloud } from
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Guard } from "@/components/Guard";
+import { StatusBadge } from "@/components/badges";
+import { StudentNextStep } from "@/components/StudentNextStep";
 import { SuggestPanel } from "@/components/SuggestPanel";
 import { Button, Card, FieldError, Input, Label, Modal, Select, Textarea } from "@/components/ui";
 import { api, ApiError, sanitize } from "@/lib/api";
 import { fileSize } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
+import { usePublicService } from "@/lib/public-service";
 import type { CategoryMeta, RequestDetail } from "@/lib/types";
 
 const SUBJECT_MAX = 150;
 const DESC_MIN = 10;
 const DESC_MAX = 2000;
-const MAX_FILE = 10 * 1024 * 1024;
 const ALLOWED = ["pdf", "jpg", "jpeg", "png", "docx"];
 
 interface Preview {
@@ -26,6 +28,8 @@ interface Preview {
 
 function NewRequestForm() {
   const { t } = useI18n();
+  const service = usePublicService();
+  const maxUploadMb = service?.max_upload_mb ?? 10;
   const [categories, setCategories] = useState<CategoryMeta[]>([]);
   const [category, setCategory] = useState("");
   const [subject, setSubject] = useState("");
@@ -38,6 +42,7 @@ function NewRequestForm() {
   const [serverError, setServerError] = useState("");
   const [preview, setPreview] = useState<Preview | null>(null);
   const [created, setCreated] = useState<RequestDetail | null>(null);
+  const [attachmentFailed, setAttachmentFailed] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   // One suggestion session per form fill: what was shown is saved with the request (US20).
   const [sessionId, setSessionId] = useState(() => crypto.randomUUID());
@@ -90,8 +95,8 @@ function NewRequestForm() {
         setFileError(`${f.name}: ${t("form.fileType")}`);
         continue;
       }
-      if (f.size > MAX_FILE) {
-        setFileError(`${f.name}: ${t("form.fileSize")}`);
+      if (f.size > maxUploadMb * 1024 * 1024) {
+        setFileError(`${f.name}: ${t("pilot.fileRules", { n: maxUploadMb })}`);
         continue;
       }
       if (!next.some((x) => x.name === f.name && x.size === f.size)) next.push(f);
@@ -119,7 +124,6 @@ function NewRequestForm() {
           suggestion_session: sessionId,
         },
       });
-      setCreated(req);
       if (files.length) {
         const ids: number[] = [];
         for (const f of files) {
@@ -128,10 +132,15 @@ function NewRequestForm() {
           try {
             const a = await api<{ id: number }>(`/requests/${req.id}/attachments`, { method: "POST", body: fd });
             ids.push(a.id);
-          } catch {}
+          } catch { setAttachmentFailed(true); }
         }
-        if (ids.length) await api(`/requests/${req.id}/messages`, { method: "POST", json: { body: "", attachment_ids: ids } });
+        if (ids.length) {
+          try {
+            await api(`/requests/${req.id}/messages`, { method: "POST", json: { body: "", attachment_ids: ids } });
+          } catch { setAttachmentFailed(true); }
+        }
       }
+      setCreated(req);
     } catch (err) {
       setServerError(err instanceof ApiError ? err.message : t("common.error"));
     } finally {
@@ -145,6 +154,8 @@ function NewRequestForm() {
     setSubject("");
     setDescription("");
     setFiles([]);
+    setFileError("");
+    setAttachmentFailed(false);
     setTried(false);
     setTouched({});
     setPreview(null);
@@ -178,6 +189,9 @@ function NewRequestForm() {
     <div className="mx-auto max-w-2xl">
       <h1 className="text-2xl font-bold">{t("form.title")}</h1>
       <p className="mb-6 mt-1 text-muted">{t("form.intro")}</p>
+      {service?.privacy_url && <p className="-mt-3 mb-4 text-sm">
+        <a href={service.privacy_url} className="font-medium text-primary underline">{t("pilot.dataInfo")}</a>
+      </p>}
       <Card className="p-5 sm:p-6">
         <form onSubmit={submit} noValidate className="space-y-5">
           <div>
@@ -260,14 +274,14 @@ function NewRequestForm() {
 
           <SuggestPanel subject={subject} description={description} sessionId={sessionId} onDeflect={() => setDeflected(true)} />
 
-          <div>
+          {service?.attachments_enabled && <div>
             <span className="mb-1 block text-sm font-medium">{t("form.attachments")}</span>
             <input
               ref={fileInput}
               type="file"
               multiple
               accept=".pdf,.jpg,.jpeg,.png,.docx"
-              className="sr-only"
+              hidden
               id="files"
               onChange={(e) => {
                 addFiles(e.target.files);
@@ -298,7 +312,7 @@ function NewRequestForm() {
                   {t("form.browse")}
                 </button>
               </span>
-              <span className="text-xs text-muted">{t("form.fileRules")}</span>
+              <span className="text-xs text-muted">{t("pilot.fileRules", { n: maxUploadMb })}</span>
             </div>
             {/* Mobile: wide touch-friendly button (US4) */}
             <div className="md:hidden">
@@ -306,7 +320,7 @@ function NewRequestForm() {
                 <Paperclip className="h-5 w-5" aria-hidden />
                 {t("form.chooseFile")}
               </Button>
-              <p className="mt-1 text-xs text-muted">{t("form.fileRules")}</p>
+              <p className="mt-1 text-xs text-muted">{t("pilot.fileRules", { n: maxUploadMb })}</p>
             </div>
             <FieldError>{fileError}</FieldError>
             {files.length > 0 && (
@@ -328,7 +342,7 @@ function NewRequestForm() {
                 ))}
               </ul>
             )}
-          </div>
+          </div>}
 
           <FieldError>{serverError}</FieldError>
           <Button type="submit" className="w-full sm:w-auto" loading={busy} disabled={overLimit}>
@@ -340,18 +354,19 @@ function NewRequestForm() {
       <Modal open={!!created} onClose={reset} title={t("form.success")}>
         {created && (
           <div className="text-center">
-            <svg viewBox="0 0 52 52" className="success-pop mx-auto h-20 w-20" aria-hidden>
+            <svg viewBox="0 0 52 52" className="success-pop mx-auto h-11 w-11" aria-hidden>
               <circle cx="26" cy="26" r="24" fill="var(--ok)" />
               <path className="success-check" d="M15 27l7 7 15-15" fill="none" stroke="white" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             <p className="mt-4 text-sm text-muted">{t("form.successId")}</p>
             <p className="text-2xl font-bold tabular-nums">{created.id}</p>
-            {created.category && (
-              <p className="mt-2 text-sm">
-                {created.category.name} → {created.unit?.name}
-              </p>
-            )}
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-2 text-sm">
+              <StatusBadge status={created.status} />
+              <span className="font-medium">{created.unit?.name ?? t("nav.triage")}</span>
+            </div>
             <p className="mt-3 text-sm text-muted">{t("form.successText")}</p>
+            <div className="mt-3"><StudentNextStep request={created} /></div>
+            {attachmentFailed && <FieldError>{t("pilot.attachFailed")}</FieldError>}
             <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-center">
               <Link href={`/requests/${created.id}`} className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-primary-fg hover:bg-primary/90">
                 {t("form.view")}

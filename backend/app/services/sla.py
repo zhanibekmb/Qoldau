@@ -32,18 +32,28 @@ def policy_for(db: Session, priority: str) -> tuple[float, float, bool]:
     return fr, res, False
 
 
+def parse_working_hours(value: str | None) -> tuple[int, int, timedelta, timedelta] | None:
+    if not value or not (match := _WH_RE.fullmatch(value.strip())):
+        return None
+    first, last, open_hour, open_minute, close_hour, close_minute = match.groups()
+    oh, om, ch, cm = map(int, (open_hour, open_minute, close_hour, close_minute))
+    if oh > 23 or om > 59 or ch > 23 or cm > 59 or (oh, om) >= (ch, cm):
+        return None
+    return (_DAYS.index(first.lower()), _DAYS.index(last.lower()),
+            timedelta(hours=oh, minutes=om), timedelta(hours=ch, minutes=cm))
+
+
 def add_hours(start: datetime, hours: float, working_hours: str | None, use_working_hours: bool) -> datetime:
     """Add SLA hours, counting only the unit's working hours when configured (e.g. "Mon-Fri 09:00-18:00")."""
-    if not use_working_hours or not working_hours or not (m := _WH_RE.search(working_hours)):
+    schedule = parse_working_hours(working_hours) if use_working_hours else None
+    if schedule is None:
         return start + timedelta(hours=hours)
-    d0, d1 = _DAYS.index(m.group(1).lower()), _DAYS.index(m.group(2).lower())
-    open_t = timedelta(hours=int(m.group(3)), minutes=int(m.group(4)))
-    close_t = timedelta(hours=int(m.group(5)), minutes=int(m.group(6)))
+    d0, d1, open_t, close_t = schedule
     remaining = timedelta(hours=hours)
     cur = start + LOCAL_UTC_OFFSET
     for _ in range(3660):  # hard stop: ~10 years of days
         day_start = cur.replace(hour=0, minute=0, second=0, microsecond=0)
-        if d0 <= cur.weekday() <= d1:
+        if (cur.weekday() - d0) % 7 <= (d1 - d0) % 7:
             window_open, window_close = day_start + open_t, day_start + close_t
             if cur < window_open:
                 cur = window_open
@@ -126,7 +136,9 @@ def _unit_staff(db: Session, unit_id: int, roles: tuple[str, ...]) -> list[User]
 def _unit_head(db: Session, unit_id: int) -> User | None:
     unit = db.get(Unit, unit_id)
     if unit and unit.head_user_id:
-        return db.get(User, unit.head_user_id)
+        head = db.get(User, unit.head_user_id)
+        if head and head.is_active and head.unit_id == unit_id and head.role == Role.UNIT_HEAD:
+            return head
     heads = _unit_staff(db, unit_id, (Role.UNIT_HEAD,))
     return heads[0] if heads else None
 

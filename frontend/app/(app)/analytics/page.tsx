@@ -6,8 +6,9 @@ import { useEffect, useState } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { PriorityBadge } from "@/components/badges";
 import { ExportMenu } from "@/components/ExportMenu";
+import { FilterDate, FilterDialog, FilterSelect } from "@/components/FilterDialog";
 import { Guard } from "@/components/Guard";
-import { Card, Input, Select, Spinner } from "@/components/ui";
+import { Card, Spinner } from "@/components/ui";
 import { api, qs } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
@@ -61,6 +62,7 @@ const STACK = [
   { key: "waiting", label: "an.waiting", color: "var(--series-3)" },
   { key: "resolved", label: "an.resolved", color: "var(--series-4)" },
 ] as const;
+const DEFAULT_FILTERS = { range: "30", from: "", to: "", unitId: "", categoryId: "" };
 
 const LINES = [
   { key: "created", label: "an.created", color: "var(--series-1)" },
@@ -93,19 +95,23 @@ function Legend({ items }: { items: { label: string; color: string; value?: stri
 
 function Kpi({ label, value, hint, status }: { label: string; value: string; hint?: string; status?: { ok: boolean; text: string } }) {
   return (
-    <Card className="flex flex-col p-4">
-      <div className="text-sm text-muted">{label}</div>
-      <div className="mt-1 text-3xl font-bold">{value}</div>
-      <div className="mt-auto pt-1 text-sm text-muted">
-        {status && (
-          <span className={clsx("mr-1.5 inline-flex items-center gap-1 font-semibold", status.ok ? "text-ok" : "text-warn")}>
-            {status.ok ? <CheckCircle2 className="h-4 w-4" aria-hidden /> : <AlertTriangle className="h-4 w-4" aria-hidden />}
-            {status.text}
+    <div className="min-w-0 bg-surface px-3 py-2.5 sm:px-4 sm:py-3">
+      <dt className="text-xs leading-snug text-muted sm:text-sm">{label}</dt>
+      <dd className="mt-1">
+        <span className="block break-words text-2xl leading-tight font-semibold tabular-nums lg:text-[1.625rem]">{value}</span>
+        {(hint || status) && (
+          <span className="mt-1 block text-xs leading-snug text-muted">
+            {status && (
+              <span className={clsx("mr-1.5 inline-flex items-center gap-1 font-medium", status.ok ? "text-ok" : "text-warn")}>
+                {status.ok ? <CheckCircle2 className="size-3" aria-hidden /> : <AlertTriangle className="size-3" aria-hidden />}
+                {status.text}
+              </span>
+            )}
+            {hint && <span className={status ? "inline-block" : undefined}>{hint}</span>}
           </span>
         )}
-        {hint}
-      </div>
-    </Card>
+      </dd>
+    </div>
   );
 }
 
@@ -204,11 +210,8 @@ function AnalyticsView() {
   const { user } = useAuth();
   const { t, lang } = useI18n();
   const isAdmin = user?.role === "admin";
-  const [range, setRange] = useState("30");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  const [unitId, setUnitId] = useState("");
-  const [categoryId, setCategoryId] = useState("");
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const { range, from, to, unitId, categoryId } = filters;
   const [units, setUnits] = useState<UnitMeta[]>([]);
   const [cats, setCats] = useState<CategoryMeta[]>([]);
   const [data, setData] = useState<Dashboard | null>(null);
@@ -234,6 +237,7 @@ function AnalyticsView() {
     category_id: categoryId ? Number(categoryId) : undefined,
   };
   const lockedUnit = !isAdmin ? units.find((u) => u.id === user?.unit_id)?.name ?? user?.unit_name : null;
+  const period = t(RANGES.find(([value]) => value === range)?.[1] ?? "an.range30");
   const k = data?.kpis;
   const hours = (v: number | null) => (v === null ? "—" : t("an.hours", { v: num(v, lang) }));
   const pct = (v: number | null) => (v === null ? "—" : `${num(v, lang)}%`);
@@ -241,44 +245,47 @@ function AnalyticsView() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <h1 className="text-2xl font-bold">{t("nav.analytics")}</h1>
-        {/* One filter row scopes every chart on the page */}
+        <div>
+          <h1 className="text-2xl font-bold">{t("nav.analytics")}</h1>
+          <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
+            {lockedUnit && (
+              <span className="inline-flex items-center gap-1.5" title={t("an.lockedUnit")}>
+                <Lock className="size-3.5" aria-hidden /> {lockedUnit}
+              </span>
+            )}
+            <span>{period}</span>
+          </p>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Select aria-label={t("an.rangeCustom")} value={range} onChange={(e) => setRange(e.target.value)} className="w-auto">
-            {RANGES.map(([v, l]) => (
-              <option key={v} value={v}>
-                {t(l)}
-              </option>
-            ))}
-          </Select>
-          {range === "custom" && (
-            <>
-              <Input type="date" aria-label={t("list.from")} value={from} onChange={(e) => setFrom(e.target.value)} className="w-auto" />
-              <Input type="date" aria-label={t("list.to")} value={to} onChange={(e) => setTo(e.target.value)} className="w-auto" />
-            </>
-          )}
-          {isAdmin ? (
-            <Select aria-label={t("an.office")} value={unitId} onChange={(e) => setUnitId(e.target.value)} className="w-auto max-w-[16rem]">
-              <option value="">{t("an.allUnits")}</option>
-              {units.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name}
-                </option>
-              ))}
-            </Select>
-          ) : (
-            <span className="inline-flex min-h-11 items-center gap-2 rounded-md bg-surface-2 px-3 text-sm" title={t("an.lockedUnit")}>
-              <Lock className="h-4 w-4 text-muted" aria-hidden /> {lockedUnit}
-            </span>
-          )}
-          <Select aria-label={t("an.topic")} value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="w-auto max-w-[16rem]">
-            <option value="">{t("an.allCategories")}</option>
-            {cats.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </Select>
+          <FilterDialog
+            value={filters}
+            defaults={DEFAULT_FILTERS}
+            onApply={(next) => setFilters(next.range === "custom" ? next : { ...next, from: "", to: "" })}
+          >
+            {(draft, update) => (
+              <>
+                <FilterSelect label={t("an.period")} wide value={draft.range} onChange={(e) => update({ range: e.target.value })}>
+                  {RANGES.map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}
+                </FilterSelect>
+                {draft.range === "custom" && (
+                  <>
+                    <FilterDate label={t("list.from")} value={draft.from} max={draft.to || undefined} onChange={(e) => update({ from: e.target.value })} />
+                    <FilterDate label={t("list.to")} value={draft.to} min={draft.from || undefined} onChange={(e) => update({ to: e.target.value })} />
+                  </>
+                )}
+                {isAdmin && (
+                  <FilterSelect label={t("an.office")} wide value={draft.unitId} onChange={(e) => update({ unitId: e.target.value })}>
+                    <option value="">{t("an.allUnits")}</option>
+                    {units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  </FilterSelect>
+                )}
+                <FilterSelect label={t("an.topic")} wide value={draft.categoryId} onChange={(e) => update({ categoryId: e.target.value })}>
+                  <option value="">{t("an.allCategories")}</option>
+                  {cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </FilterSelect>
+              </>
+            )}
+          </FilterDialog>
           <ExportMenu filters={exportFilters} />
         </div>
       </div>
@@ -288,7 +295,7 @@ function AnalyticsView() {
       ) : (
         // Hold the previous numbers (dimmed) while a new filter loads; no layout jump.
         <div className={clsx("space-y-6 transition-opacity", loading && "opacity-60")} aria-busy={loading}>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border lg:grid-cols-4">
             <Kpi label={t("an.total")} value={num(k.total, lang, 0)} hint={t("an.totalHint", { open: k.open, resolved: k.resolved })} />
             <Kpi
               label={t("an.firstResponse")}
@@ -307,7 +314,7 @@ function AnalyticsView() {
             <Kpi label={t("an.ai")} value={pct(k.ai_accuracy)} hint={t("an.aiHint", { n: k.overrides })} />
             <Kpi label={t("an.deflection")} value={pct(k.deflection_rate)} hint={t("an.deflectionHint", { n: k.deflections })} />
             <Kpi label={t("an.smartReply")} value={pct(k.smart_reply_usage)} hint={t("an.smartReplyHint", { n: k.smart_reply_requests })} />
-          </div>
+          </dl>
 
           <Panel
             title={t("an.overTime")}

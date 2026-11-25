@@ -3,8 +3,12 @@ import { Inter } from "next/font/google";
 import { Providers } from "@/components/Providers";
 import "./globals.css";
 
-// One typeface everywhere; cyrillic-ext covers Kazakh letters (ә ғ қ ң ө ұ ү һ і).
-const inter = Inter({ variable: "--font-inter", subsets: ["latin", "cyrillic", "cyrillic-ext"] });
+const inter = Inter({
+  variable: "--font-qoldau",
+  subsets: ["latin", "cyrillic", "cyrillic-ext"],
+  axes: ["opsz"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: { default: "Qoldau — SDU University student support", template: "%s · Qoldau" },

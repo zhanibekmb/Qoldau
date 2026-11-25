@@ -23,6 +23,7 @@
   --primary: #1b45b4;
   --primary-fg: #ffffff;
   --primary-soft: #e9eefb;
+  --landing-field: #f3f6fc;
   --ring: #1b45b4;
   --critical: #c42020;
   --high: #c2410c;
@@ -52,6 +53,7 @@
   --primary: #86a8ff;
   --primary-fg: #0f1115;
   --primary-soft: #1c2640;
+  --landing-field: #161d2b;
   --ring: #86a8ff;
   --critical: #ff6b6b;
   --high: #ff922b;
@@ -76,13 +78,14 @@
   --color-primary: var(--primary);
   --color-primary-fg: var(--primary-fg);
   --color-primary-soft: var(--primary-soft);
+  --color-landing-field: var(--landing-field);
   --color-critical: var(--critical);
   --color-high: var(--high);
   --color-medium: var(--medium);
   --color-low: var(--low);
   --color-ok: var(--ok);
   --color-warn: var(--warn);
-  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-sans: var(--font-qoldau), system-ui, sans-serif;
 }
 
 html,
@@ -92,8 +95,13 @@ body {
 }
 
 body {
-  font-family: var(--font-sans);
+  font-family: var(--font-qoldau), system-ui, sans-serif;
+  font-optical-sizing: auto;
   overflow-x: hidden;
+}
+
+.display-type {
+  font-feature-settings: "cv11" 1;
 }
 
 :focus-visible {

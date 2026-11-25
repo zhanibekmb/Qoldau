@@ -81,9 +81,11 @@ def test_waiting_for_student_notifies_bell_and_email(client, db):
                      json={"status": "Waiting for Student", "message": "Which room number is it?"})
     assert r.status_code == 200
     assert client.get("/api/v1/notifications/unread-count", headers=hs).json()["count"] == 1
-    mail = db.query(EmailOutbox).filter(EmailOutbox.subject.contains(req["id"]),
-                                        EmailOutbox.subject.contains("Waiting for Student")).one()
-    assert "Which room number is it?" in mail.body and "Status: Waiting for Student" in mail.body
+    mail = (db.query(EmailOutbox).filter_by(to="student@qoldau.edu.kz")
+            .order_by(EmailOutbox.id.desc()).first())
+    assert mail and mail.status == "logged"
+    assert all(value not in (mail.subject + mail.body) for value in
+               (req["id"], "Waiting for Student", "Which room number is it?"))
     # Reading resets the counter and it never goes negative.
     assert client.post("/api/v1/notifications/read", headers=hs).json()["count"] == 0
     assert client.post("/api/v1/notifications/read", headers=hs).json()["count"] == 0

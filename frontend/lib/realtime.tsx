@@ -33,7 +33,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || user.must_change_password) return;
     let ws: WebSocket | null = null;
     let stopped = false;
     let attempt = 0;

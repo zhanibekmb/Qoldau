@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import (JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, LargeBinary, String, Text,
-                        UniqueConstraint)
+                        UniqueConstraint, false as sa_false)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base, utcnow
@@ -59,6 +59,8 @@ class User(Base):
     unit_id: Mapped[int | None] = mapped_column(ForeignKey("units.id", ondelete="SET NULL"), index=True)
     language: Mapped[str] = mapped_column(String(2), default="en")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=False, server_default=sa_false())
+    session_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime)
     last_assigned_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
@@ -201,6 +203,7 @@ class Message(Base):
 
 class Attachment(Base):
     __tablename__ = "attachments"
+    scan_engine: Mapped[str | None] = mapped_column(String(20))
     id: Mapped[int] = mapped_column(primary_key=True)
     request_id: Mapped[str] = mapped_column(ForeignKey("requests.id", ondelete="CASCADE"), index=True)
     message_id: Mapped[int | None] = mapped_column(ForeignKey("messages.id", ondelete="SET NULL"))
@@ -247,11 +250,30 @@ class Notification(Base):
 class EmailOutbox(Base):
     __tablename__ = "email_outbox"
     id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    kind: Mapped[str] = mapped_column(String(30), default="notification", server_default="notification")
     to: Mapped[str] = mapped_column(String(160))
     subject: Mapped[str] = mapped_column(String(250))
     body: Mapped[str] = mapped_column(Text)
-    status: Mapped[str] = mapped_column(String(10), default="queued")  # queued / sent / failed / logged
+    status: Mapped[str] = mapped_column(String(10), default="queued")  # queued / sending / sent / failed / logged
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime)
+    claim_id: Mapped[str | None] = mapped_column(String(32))
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime)
+    last_error: Mapped[str | None] = mapped_column(String(40))
+
+    __table_args__ = (Index("ix_email_outbox_delivery", "status", "next_attempt_at"),)
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
 class CSAT(Base):

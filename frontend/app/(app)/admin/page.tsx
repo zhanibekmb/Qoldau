@@ -36,7 +36,8 @@ const COPY = {
     workingHours: "Working hours", triageUnit: "Triage unit", priority: "Priority",
     firstResponse: "First response (h)", resolution: "Resolution (h)", workingHoursOnly: "Working hours only",
     keyword: "Keyword", weight: "Weight (−30 to 60)", forcesCritical: "Forces Critical",
-    language: "Language", role: "Role", passwordKeep: "Password (leave empty to keep)",
+    language: "Language", role: "Role", passwordKeep: "Temporary password (12+ characters)",
+    passwordHint: "Required for new accounts. Leave empty when editing to keep the current password.",
     when: "When", who: "Who", action: "Action", entity: "Entity", change: "Change (old → new)",
     add: "Add", edit: "Edit", delete: "Delete", save: "Save", cancel: "Cancel",
     workflows: { standard: "Standard", approval: "Approval", document: "Document", urgent: "Urgent", triage: "Triage" },
@@ -50,7 +51,8 @@ const COPY = {
     workingHours: "Рабочие часы", triageUnit: "Подразделение первичной обработки", priority: "Приоритет",
     firstResponse: "Первый ответ (ч)", resolution: "Решение (ч)", workingHoursOnly: "Только рабочие часы",
     keyword: "Ключевое слово", weight: "Вес (от −30 до 60)", forcesCritical: "Принудительно критический",
-    language: "Язык", role: "Роль", passwordKeep: "Пароль (оставьте пустым, чтобы не менять)",
+    language: "Язык", role: "Роль", passwordKeep: "Временный пароль (от 12 символов)",
+    passwordHint: "Обязателен для нового аккаунта. При редактировании пустое поле сохраняет текущий пароль.",
     when: "Когда", who: "Кто", action: "Действие", entity: "Объект", change: "Изменение (было → стало)",
     add: "Добавить", edit: "Изменить", delete: "Удалить", save: "Сохранить", cancel: "Отмена",
     workflows: { standard: "Стандартный", approval: "Согласование", document: "Документ", urgent: "Срочный", triage: "Первичная обработка" },
@@ -64,7 +66,8 @@ const COPY = {
     workingHours: "Жұмыс уақыты", triageUnit: "Алғашқы қарау бөлімі", priority: "Басымдық",
     firstResponse: "Алғашқы жауап (сағ)", resolution: "Шешу (сағ)", workingHoursOnly: "Тек жұмыс уақыты",
     keyword: "Кілт сөз", weight: "Салмақ (−30–60)", forcesCritical: "Міндетті түрде шұғыл",
-    language: "Тіл", role: "Рөл", passwordKeep: "Құпиясөз (өзгертпеу үшін бос қалдырыңыз)",
+    language: "Тіл", role: "Рөл", passwordKeep: "Уақытша құпиясөз (кемінде 12 таңба)",
+    passwordHint: "Жаңа аккаунтқа міндетті. Өңдеу кезінде бос қалдырсаңыз, құпиясөз сақталады.",
     when: "Қашан", who: "Кім", action: "Әрекет", entity: "Нысан", change: "Өзгеріс (бұрын → кейін)",
     add: "Қосу", edit: "Өңдеу", delete: "Жою", save: "Сақтау", cancel: "Бас тарту",
     workflows: { standard: "Стандартты", approval: "Бекіту", document: "Құжат", urgent: "Шұғыл", triage: "Алғашқы қарау" },
@@ -389,11 +392,16 @@ function AdminView() {
                     <Input
                       id={`f-${f.key}`}
                       type={f.type === "number" ? "number" : f.type === "password" ? "password" : "text"}
+                      autoComplete={f.type === "password" ? "new-password" : undefined}
+                      minLength={f.type === "password" ? 12 : undefined}
+                      maxLength={f.type === "password" ? 72 : undefined}
+                      aria-describedby={f.type === "password" ? "temporary-password-hint" : undefined}
                       step="any"
                       value={String(form[f.key] ?? "")}
                       onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
                     />
                   )}
+                  {f.type === "password" && <p id="temporary-password-hint" className="mt-1 text-xs text-muted">{c.passwordHint}</p>}
                 </>
               )}
             </div>

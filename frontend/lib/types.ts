@@ -11,6 +11,7 @@ export interface User {
   unit_name: string | null;
   language: Lang;
   is_active: boolean;
+  must_change_password: boolean;
 }
 
 export interface Brief {

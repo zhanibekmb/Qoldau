@@ -3,6 +3,7 @@
 import clsx from "clsx";
 import { Archive, History, Pencil, Plus, Search, Send, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FilterDialog, FilterSelect } from "@/components/FilterDialog";
 import { Guard } from "@/components/Guard";
 import { RichTextEditor } from "@/components/RichText";
 import { Badge, Button, Card, Empty, FieldError, Input, Label, Modal, Select, Spinner, Textarea, Toast } from "@/components/ui";
@@ -13,6 +14,7 @@ import { useI18n } from "@/lib/i18n";
 import type { CategoryMeta, FAQArticle, FAQStatus, FAQVersion, Lang, Page, ReplyTemplate, User } from "@/lib/types";
 
 const LANGS: Lang[] = ["kz", "ru", "en"];
+const DEFAULT_FILTERS = { status: "", language: "", category: "" };
 const PLACEHOLDERS = ["{student_name}", "{request_id}", "{unit}", "{agent_name}"];
 const STATUS_CLS: Record<FAQStatus, string> = {
   draft: "bg-warn/12 text-warn",
@@ -436,37 +438,42 @@ function KbView() {
       </div>
       {user.role === "agent" && tab === "faq" && <p className="text-sm text-muted">{t("kb.agentHint")}</p>}
 
-      <div className="flex flex-wrap gap-2">
-        <div className="relative min-w-60 flex-1">
+      <div className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1 sm:max-w-md">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden />
-          <Input aria-label={t("common.search")} placeholder={t("kb.searchPh")} value={q} onChange={(e) => setQ(e.target.value)} className="pl-9" />
+          <Input type="search" aria-label={t("common.search")} placeholder={t("kb.searchPh")} value={q} onChange={(e) => setQ(e.target.value)} className="min-w-0 pl-9" />
         </div>
-        {tab === "faq" && (
-          <Select aria-label={t("kb.status")} value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="w-auto">
-            <option value="">{t("kb.allStatuses")}</option>
-            {(["draft", "published", "archived"] as const).map((s) => (
-              <option key={s} value={s}>
-                {t(`kb.st.${s}`)}
-              </option>
-            ))}
-          </Select>
-        )}
-        <Select aria-label={t("kb.language")} value={language} onChange={(e) => { setLanguage(e.target.value); setPage(1); }} className="w-auto">
-          <option value="">{t("kb.allLanguages")}</option>
-          {LANGS.map((l) => (
-            <option key={l} value={l}>
-              {l.toUpperCase()}
-            </option>
-          ))}
-        </Select>
-        <Select aria-label={t("kb.category")} value={category} onChange={(e) => { setCategory(e.target.value); setPage(1); }} className="w-auto max-w-[16rem]">
-          <option value="">{t("an.allCategories")}</option>
-          {cats.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </Select>
+        <FilterDialog
+          value={{ status: tab === "faq" ? status : "", language, category }}
+          defaults={DEFAULT_FILTERS}
+          onApply={(next) => {
+            if (tab === "faq") setStatus(next.status);
+            setLanguage(next.language);
+            setCategory(next.category);
+            setPage(1);
+          }}
+        >
+          {(draft, update) => (
+            <>
+              {tab === "faq" && (
+                <FilterSelect label={t("kb.status")} value={draft.status} onChange={(e) => update({ status: e.target.value })}>
+                  <option value="">{t("kb.allStatuses")}</option>
+                  {(["draft", "published", "archived"] as const).map((s) => (
+                    <option key={s} value={s}>{t(`kb.st.${s}`)}</option>
+                  ))}
+                </FilterSelect>
+              )}
+              <FilterSelect label={t("kb.language")} wide={tab !== "faq"} value={draft.language} onChange={(e) => update({ language: e.target.value })}>
+                <option value="">{t("kb.allLanguages")}</option>
+                {LANGS.map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}
+              </FilterSelect>
+              <FilterSelect label={t("kb.category")} wide value={draft.category} onChange={(e) => update({ category: e.target.value })}>
+                <option value="">{t("an.allCategories")}</option>
+                {cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </FilterSelect>
+            </>
+          )}
+        </FilterDialog>
       </div>
 
       {tab === "faq" ? (

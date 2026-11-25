@@ -1,13 +1,37 @@
 """Read-only directory data for forms (category dropdown, override panel, assignee picker)."""
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
+from ..config import get_settings
 from ..db import get_db
-from ..models import Category, Role, Unit, User
+from ..models import Category, Role, SLAPolicy, Unit, User
 from ..security import current_user, require_staff
-from ..services import routing, workflow
+from ..services import routing, sla, workflow
 
 router = APIRouter(prefix="/meta", tags=["meta"])
+
+
+@router.get("/public")
+def public_service(response: Response, db: Session = Depends(get_db)):
+    response.headers["Cache-Control"] = "no-store"
+    settings = get_settings()
+    publish = settings.pilot_directory_published
+    directories = db.query(Unit).order_by(Unit.id).all() if publish else []
+    policies = {policy.priority: policy for policy in db.query(SLAPolicy)} if publish else {}
+    return {
+        "support_email": settings.pilot_support_email,
+        "privacy_url": settings.pilot_privacy_url or None,
+        "data_contact": settings.pilot_data_contact,
+        "attachments_enabled": settings.effective_attachment_mode != "disabled",
+        "max_upload_mb": settings.max_upload_mb,
+        "offices": [{"id": unit.id, "name": unit.name, "email": unit.email, "working_hours": unit.working_hours,
+                     "is_triage": unit.is_triage} for unit in directories],
+        "sla": [
+            {"priority": policy.priority, "first_response_hours": policy.first_response_hours,
+             "resolution_hours": policy.resolution_hours, "use_working_hours": policy.use_working_hours}
+            for priority in sla.DEFAULT_POLICIES if (policy := policies.get(priority)) is not None
+        ],
+    }
 
 
 @router.get("/categories")

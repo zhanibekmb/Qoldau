@@ -3,7 +3,7 @@ import re
 from datetime import date, datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, PlainSerializer, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, PlainSerializer, field_validator, model_validator
 
 UTCDateTime = Annotated[datetime, PlainSerializer(lambda d: d.isoformat() + "Z" if d.tzinfo is None else d.isoformat(),
                                                   return_type=str)]
@@ -51,6 +51,27 @@ class RefreshIn(BaseModel):
     refresh_token: str
 
 
+class ChangePasswordIn(BaseModel):
+    current_password: str = Field(min_length=1, max_length=200)
+    new_password: str = Field(min_length=12, max_length=72)
+
+
+class PasswordResetRequestIn(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirmIn(BaseModel):
+    token: str = Field(min_length=32, max_length=200)
+    new_password: str = Field(min_length=12, max_length=72)
+    confirm_password: str = Field(min_length=12, max_length=72)
+
+    @model_validator(mode="after")
+    def matching_passwords(self):
+        if self.new_password != self.confirm_password:
+            raise ValueError("Passwords do not match")
+        return self
+
+
 class TokenOut(BaseModel):
     access_token: str
     refresh_token: str
@@ -66,6 +87,7 @@ class UserOut(ORM):
     unit_name: str | None = None
     language: LangT
     is_active: bool
+    must_change_password: bool
 
 
 class UserBrief(ORM):
@@ -343,7 +365,7 @@ class UserIn(BaseModel):
     unit_id: int | None = None
     language: LangT = "en"
     is_active: bool = True
-    password: str | None = Field(default=None, min_length=6, max_length=200)
+    password: str | None = Field(default=None, min_length=12, max_length=72)
 
 
 class AuditOut(ORM):
