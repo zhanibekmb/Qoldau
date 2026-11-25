@@ -25,6 +25,7 @@ def _request(client, email):
 def test_reset_email_is_generic_sdu_only_and_token_is_issued_on_delivery(client, db, monkeypatch):
     settings = get_settings()
     monkeypatch.setattr(settings, "smtp_host", "relay.test")
+    monkeypatch.setattr(settings, "email_portal_url", "http://127.0.0.1:18435/login")
     monkeypatch.setattr(settings, "smtp_user", "")
     monkeypatch.setattr(settings, "smtp_password", "")
     sent_bodies = []
@@ -60,6 +61,7 @@ def test_reset_email_is_generic_sdu_only_and_token_is_issued_on_delivery(client,
 def test_reset_is_one_time_revokes_sessions_and_accepts_new_password(client, db, monkeypatch):
     settings = get_settings()
     monkeypatch.setattr(settings, "smtp_host", "relay.test")
+    monkeypatch.setattr(settings, "email_portal_url", "http://127.0.0.1:18435/login")
     monkeypatch.setattr(settings, "smtp_user", "")
     monkeypatch.setattr(settings, "smtp_password", "")
     sent_bodies = []
